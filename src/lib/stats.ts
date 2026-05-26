@@ -73,9 +73,14 @@ export function calcPlayerStats(
       if (result.rank === 1) s.topCount++
       if (result.rank === 4) s.lastCount++
 
-      // ポイント計算: (素点 - 返し点) / 1000 + ウマ
+      // ポイント計算: (素点 - 返し点) / 1000 + ウマ + オカ(1位のみ)
+      // オカ = (返し点 - 持ち点) × 4 / 1000 を1位に加算してゼロサムを保つ
       if (rule && s.totalPoints !== null) {
-        const chip = (result.score - rule.returnPoints) / 1000 + rule.uma[result.rank - 1]
+        const oka =
+          result.rank === 1
+            ? (rule.returnPoints - rule.startingPoints) * 4 / 1000
+            : 0
+        const chip = (result.score - rule.returnPoints) / 1000 + rule.uma[result.rank - 1] + oka
         s.totalPoints += chip
       }
     }
