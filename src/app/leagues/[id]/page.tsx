@@ -63,14 +63,19 @@ async function generateInvite(leagueId: string) {
 }
 
 /**
- * リーグのポイントルールを更新する
+ * リーグの設定（基本情報 + ポイントルール）を更新する
  */
 async function updateLeagueSettings(leagueId: string, formData: FormData) {
   'use server'
+  const name = (formData.get('name') as string ?? '').trim()
+  if (!name) throw new Error('リーグ名は必須です')
+
+  const toStr = (key: string) => (formData.get(key) as string || null)
   const toInt = (key: string) => {
     const v = (formData.get(key) as string ?? '').trim()
     return v !== '' ? parseInt(v, 10) : null
   }
+
   const uma_1 = toInt('uma_1')
   const uma_2 = toInt('uma_2')
   const uma_3 = uma_2 !== null ? -uma_2 : null
@@ -80,11 +85,28 @@ async function updateLeagueSettings(leagueId: string, formData: FormData) {
 
   await supabase
     .from('leagues')
-    .update({ uma_1, uma_2, uma_3, uma_4, starting_points, return_points })
+    .update({
+      name,
+      start_date: toStr('start_date'),
+      end_date: toStr('end_date'),
+      notes: toStr('notes'),
+      uma_1, uma_2, uma_3, uma_4, starting_points, return_points,
+    })
     .eq('id', leagueId)
 
   revalidatePath(`/leagues/${leagueId}`)
+  revalidatePath('/leagues')
   redirect(`/leagues/${leagueId}?tab=settings&saved=1`)
+}
+
+/**
+ * リーグを削除する
+ */
+async function deleteLeague(leagueId: string) {
+  'use server'
+  await supabase.from('leagues').delete().eq('id', leagueId)
+  revalidatePath('/leagues')
+  redirect('/leagues')
 }
 
 // ── 定数 ──────────────────────────────────────────────────────
@@ -280,6 +302,7 @@ export default async function LeaguePage({
   const inputAction = saveCounters.bind(null, id, activeDate)
   const settingsAction = updateLeagueSettings.bind(null, id)
   const generateInviteAction = generateInvite.bind(null, id)
+  const deleteLeagueAction = deleteLeague.bind(null, id)
 
   return (
     <div>
@@ -687,6 +710,57 @@ export default async function LeaguePage({
             action={settingsAction}
             className="bg-white rounded-xl border border-warm-border p-6 space-y-6 max-w-lg shadow-sm"
           >
+            {/* 基本情報 */}
+            <div>
+              <h2 className="text-base font-semibold text-green-deep mb-4">基本情報</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    リーグ名 <span className="text-vermilion">*</span>
+                  </label>
+                  <input
+                    name="name"
+                    required
+                    defaultValue={league.name ?? ''}
+                    className={inputClass}
+                    placeholder="例: 2026年春リーグ"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-warm-gray mb-1">開始日</label>
+                    <input
+                      name="start_date"
+                      type="date"
+                      defaultValue={league.start_date ?? ''}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-warm-gray mb-1">終了日</label>
+                    <input
+                      name="end_date"
+                      type="date"
+                      defaultValue={league.end_date ?? ''}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-warm-gray mb-1">備考</label>
+                  <textarea
+                    name="notes"
+                    rows={2}
+                    defaultValue={league.notes ?? ''}
+                    className={inputClass}
+                    placeholder="メモなど"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <hr className="border-warm-border" />
+
             <div>
               <h2 className="text-base font-semibold text-green-deep mb-1">ポイントルール</h2>
               <p className="text-xs text-warm-gray">
@@ -805,6 +879,23 @@ export default async function LeaguePage({
                 </button>
               </form>
             )}
+          </div>
+          {/* 削除セクション */}
+          <div className="mt-6 max-w-lg">
+            <div className="border border-red-200 rounded-xl p-5 bg-red-50">
+              <h3 className="text-sm font-semibold text-red-700 mb-1">リーグを削除する</h3>
+              <p className="text-xs text-red-600 mb-4">
+                削除すると元に戻せません。このリーグの対局・成績・カウンターデータがすべて削除されます。
+              </p>
+              <form action={deleteLeagueAction}>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  このリーグを削除する
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
