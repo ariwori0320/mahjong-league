@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-green-deep: #2d4a3e;
+  --color-green-mid: #3d6b56;
+  --color-green-light: #eaf1ed;
+  --color-vermilion: #c0392b;
+  --color-vermilion-light: #fdf3f2;
+  --color-cream: #f5f0e8;
+  --color-warm-gray: #8a7e6e;
+  --color-warm-border: #d9d0c0;
+}
+
+body {
+  background-color: #f5f0e8;
+  color: #1a1a1a;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* スマホでボタンのダブルタップズームを防ぐ */
+button, a {
+  touch-action: manipulation;
+}
+
+/* 数値入力のスピナーを非表示（スマホで邪魔なため） */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
