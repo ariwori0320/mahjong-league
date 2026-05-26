@@ -275,22 +275,9 @@ export default async function LeaguePage({
       }
     }
   }
-  let inputPlayers = Object.values(leaguePlayerMap).sort((a, b) =>
+  const inputPlayers = Object.values(leaguePlayerMap).sort((a, b) =>
     (a.players?.name ?? '').localeCompare(b.players?.name ?? '', 'ja')
   )
-
-  // 対局がまだ登録されていない場合は全プレイヤーを表示
-  if (inputPlayers.length === 0) {
-    const { data: allPlayers } = await supabase
-      .from('players')
-      .select('id, name')
-      .order('name')
-    inputPlayers = (allPlayers ?? []).map((p) => ({
-      player_id: p.id,
-      rank: 0,
-      players: { name: p.name },
-    }))
-  }
 
   // 招待リンク
   const { data: invite } = await supabase
@@ -678,12 +665,14 @@ export default async function LeaguePage({
           {inputPlayers.length === 0 ? (
             <div className="bg-white rounded-xl border border-warm-border p-10 text-center">
               <p className="text-warm-gray text-sm">
-                プレイヤーが登録されていません。先に
-                <Link href="/players" className="text-green-deep underline mx-1">
-                  プレイヤー
-                </Link>
-                を追加してください。
+                対局を登録するとプレイヤーが表示されます。
               </p>
+              <Link
+                href={`/leagues/${id}/games/new`}
+                className="inline-block mt-3 text-sm text-green-deep underline"
+              >
+                対局を追加する →
+              </Link>
             </div>
           ) : (
             <CounterInputForm
