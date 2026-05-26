@@ -10,6 +10,10 @@ type Props = {
   action: (formData: FormData) => Promise<void>
   defaultDate: string
   leagueId: string
+  initialPlayerIds?: string[]
+  initialScores?: string[]
+  initialLocation?: string
+  initialNotes?: string
 }
 
 // 点数は下2桁(00)固定なので100で割った値を入力する（350 → 35000点）
@@ -18,8 +22,11 @@ const TOTAL_HUNDREDS = 1000 // 100,000点 ÷ 100
 const fieldClass =
   'w-full border border-warm-border rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-green-mid focus:ring-1 focus:ring-green-mid transition-colors'
 
-export default function NewGameForm({ players, action, defaultDate, leagueId }: Props) {
-  const [scores, setScores] = useState(['', '', '', ''])
+export default function NewGameForm({
+  players, action, defaultDate, leagueId,
+  initialPlayerIds, initialScores, initialLocation, initialNotes,
+}: Props) {
+  const [scores, setScores] = useState(initialScores ?? ['', '', '', ''])
 
   const setScore = (i: number, val: string) =>
     setScores((prev) => prev.map((v, j) => (j === i ? val : v)))
@@ -61,7 +68,7 @@ export default function NewGameForm({ players, action, defaultDate, leagueId }: 
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-sm font-medium text-gray-700 mb-1.5">場所</label>
-          <input name="location" className={fieldClass} placeholder="例: 雀荘A" />
+          <input name="location" defaultValue={initialLocation ?? ''} className={fieldClass} placeholder="例: 雀荘A" />
         </div>
       </div>
 
@@ -79,6 +86,7 @@ export default function NewGameForm({ players, action, defaultDate, leagueId }: 
                 <select
                   name={`player_${i + 1}`}
                   required
+                  defaultValue={initialPlayerIds?.[i] ?? ''}
                   className="flex-1 border border-warm-border rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-green-mid focus:ring-1 focus:ring-green-mid transition-colors"
                 >
                   <option value="">プレイヤーを選択</option>
@@ -142,7 +150,7 @@ export default function NewGameForm({ players, action, defaultDate, leagueId }: 
       {/* メモ */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">メモ</label>
-        <textarea name="notes" rows={2} className={fieldClass} placeholder="自由記入" />
+        <textarea name="notes" rows={2} defaultValue={initialNotes ?? ''} className={fieldClass} placeholder="自由記入" />
       </div>
 
       {/* ボタン */}

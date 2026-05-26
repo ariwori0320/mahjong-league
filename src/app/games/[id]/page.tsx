@@ -39,19 +39,29 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
         >
           ← {league?.name}
         </Link>
-        <h1 className="text-2xl font-bold text-green-deep mt-2">
-          {new Date(game.played_at).toLocaleDateString('ja-JP', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            weekday: 'short',
-          })}
-        </h1>
-        {game.location && (
-          <span className="inline-block text-xs text-warm-gray bg-white border border-warm-border px-2 py-0.5 rounded-full mt-1">
-            📍 {game.location}
-          </span>
-        )}
+        <div className="flex items-start justify-between mt-2">
+          <div>
+            <h1 className="text-2xl font-bold text-green-deep">
+              {new Date(game.played_at).toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short',
+              })}
+            </h1>
+            {game.location && (
+              <span className="inline-block text-xs text-warm-gray bg-white border border-warm-border px-2 py-0.5 rounded-full mt-1">
+                📍 {game.location}
+              </span>
+            )}
+          </div>
+          <Link
+            href={`/games/${id}/edit`}
+            className="flex-none text-sm border border-warm-border rounded-lg px-3 py-2 text-warm-gray hover:border-green-mid hover:text-green-deep transition-colors"
+          >
+            編集
+          </Link>
+        </div>
       </div>
 
       {/* 対局結果 */}
