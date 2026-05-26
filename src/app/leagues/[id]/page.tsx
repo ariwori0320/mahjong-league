@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase'
-import { getUser } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { calcPlayerStats, LeagueRule } from '@/lib/stats'
@@ -168,48 +167,39 @@ export default async function LeaguePage({
     to: statsTo,
   } = await searchParams
 
-  // ── データ取得 ────────────────────────────────────────────
+  // ── データ取得（全クエリ並列実行） ──────────────────────────
 
-  const { data: league } = await supabase
-    .from('leagues')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const [
+    { data: league },
+    { data: games },
+    { data: counterTypes },
+    { data: allDayCounters },
+    settingsData,
+  ] = await Promise.all([
+    supabase.from('leagues').select('*').eq('id', id).single(),
+    supabase.from('games')
+      .select('*, game_results(player_id, score, rank, players(id, name))')
+      .eq('league_id', id)
+      .order('played_at', { ascending: false }),
+    supabase.from('counter_types').select('*').order('created_at'),
+    supabase.from('league_day_counters')
+      .select('player_id, counter_type_id, count, date')
+      .eq('league_id', id),
+    // 設定タブのみ追加クエリを実行
+    tab === 'settings'
+      ? Promise.all([
+          supabase.from('league_players').select('player_id, players(id, name)').eq('league_id', id),
+          supabase.from('players').select('id, name').order('name'),
+          supabase.from('league_invites').select('token').eq('league_id', id).maybeSingle(),
+        ])
+      : Promise.resolve(null),
+  ])
 
   if (!league) notFound()
 
-  // 対局一覧（game_counters は league_day_counters に移行済み）
-  const { data: games } = await supabase
-    .from('games')
-    .select(`
-      *,
-      game_results(player_id, score, rank, players(id, name))
-    `)
-    .eq('league_id', id)
-    .order('played_at', { ascending: false })
-
-  const { data: counterTypes } = await supabase
-    .from('counter_types')
-    .select('*')
-    .order('created_at')
-
-  // カウンター（日単位）
-  const { data: allDayCounters } = await supabase
-    .from('league_day_counters')
-    .select('player_id, counter_type_id, count, date')
-    .eq('league_id', id)
-
-  // 手動追加プレイヤー
-  const { data: leaguePlayersRows } = await supabase
-    .from('league_players')
-    .select('player_id, players(id, name)')
-    .eq('league_id', id)
-
-  // 全プレイヤー（設定タブの追加ドロップダウン用）
-  const { data: allPlayers } = await supabase
-    .from('players')
-    .select('id, name')
-    .order('name')
+  const leaguePlayersRows = settingsData ? (settingsData[0].data ?? []) : []
+  const allPlayers       = settingsData ? (settingsData[1].data ?? []) : []
+  const invite           = settingsData ? settingsData[2].data : null
 
   // ── ポイントルール ──────────────────────────────────────────
   const hasRule =
@@ -334,13 +324,6 @@ export default async function LeaguePage({
   const manualPlayerIds = new Set((leaguePlayersRows ?? []).map((r) => r.player_id))
   // リーグ未参加のプレイヤー（追加ドロップダウン用）
   const addablePlayers = (allPlayers ?? []).filter((p) => !leaguePlayerMap[p.id])
-
-  // 招待リンク
-  const { data: invite } = await supabase
-    .from('league_invites')
-    .select('token')
-    .eq('league_id', id)
-    .maybeSingle()
 
   const inputAction = saveCounters.bind(null, id, activeDate)
   const settingsAction = updateLeagueSettings.bind(null, id)
