@@ -1,6 +1,7 @@
 import { createAuthClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import InAppBrowserWarning from '@/components/InAppBrowserWarning'
 
 async function signInWithGoogle(formData: FormData) {
   'use server'
@@ -29,6 +30,7 @@ export default async function LoginPage({
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
+      <InAppBrowserWarning />
       <div className="bg-white rounded-2xl border border-warm-border p-10 shadow-sm text-center max-w-sm w-full">
         <p className="text-5xl mb-4">🀄</p>
         <h1 className="text-xl font-bold text-green-deep mb-2">麻雀リーグ管理</h1>
