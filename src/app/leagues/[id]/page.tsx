@@ -100,6 +100,34 @@ async function updateLeagueSettings(leagueId: string, formData: FormData) {
 }
 
 /**
+ * リーグにプレイヤーを手動追加する
+ */
+async function addLeaguePlayer(leagueId: string, formData: FormData) {
+  'use server'
+  const playerId = formData.get('player_id') as string
+  if (!playerId) return
+  await supabase
+    .from('league_players')
+    .upsert({ league_id: leagueId, player_id: playerId })
+  revalidatePath(`/leagues/${leagueId}`)
+  redirect(`/leagues/${leagueId}?tab=settings`)
+}
+
+/**
+ * リーグから手動追加プレイヤーを削除する
+ */
+async function removeLeaguePlayer(leagueId: string, playerId: string) {
+  'use server'
+  await supabase
+    .from('league_players')
+    .delete()
+    .eq('league_id', leagueId)
+    .eq('player_id', playerId)
+  revalidatePath(`/leagues/${leagueId}`)
+  redirect(`/leagues/${leagueId}?tab=settings`)
+}
+
+/**
  * リーグを削除する
  */
 async function deleteLeague(leagueId: string) {
@@ -170,6 +198,18 @@ export default async function LeaguePage({
     .from('league_day_counters')
     .select('player_id, counter_type_id, count, date')
     .eq('league_id', id)
+
+  // 手動追加プレイヤー
+  const { data: leaguePlayersRows } = await supabase
+    .from('league_players')
+    .select('player_id, players(id, name)')
+    .eq('league_id', id)
+
+  // 全プレイヤー（設定タブの追加ドロップダウン用）
+  const { data: allPlayers } = await supabase
+    .from('players')
+    .select('id, name')
+    .order('name')
 
   // ── ポイントルール ──────────────────────────────────────────
   const hasRule =
@@ -259,25 +299,41 @@ export default async function LeaguePage({
     inputCounterMap[`${c.player_id}_${c.counter_type_id}`] = c.count
   }
 
-  // プレイヤーリスト：このリーグの全対局参加者（名前順）
+  // プレイヤーリスト：対局参加者 ∪ 手動追加（設定タブ・カウンター入力で使用）
   const leaguePlayerMap: Record<
     string,
-    { player_id: string; rank: number; players: { name: string } | null }
+    { player_id: string; rank: number; players: { name: string } | null; fromGame: boolean }
   > = {}
   for (const game of games ?? []) {
     for (const result of (game.game_results as any[]) ?? []) {
-      if (!leaguePlayerMap[result.player_id] && result.players) {
+      if (result.players) {
         leaguePlayerMap[result.player_id] = {
           player_id: result.player_id,
           rank: 0,
           players: result.players,
+          fromGame: true,
         }
+      }
+    }
+  }
+  for (const row of leaguePlayersRows ?? []) {
+    if (!leaguePlayerMap[row.player_id]) {
+      leaguePlayerMap[row.player_id] = {
+        player_id: row.player_id,
+        rank: 0,
+        players: (row.players as any) ?? null,
+        fromGame: false,
       }
     }
   }
   const inputPlayers = Object.values(leaguePlayerMap).sort((a, b) =>
     (a.players?.name ?? '').localeCompare(b.players?.name ?? '', 'ja')
   )
+
+  // 手動追加済みのID集合
+  const manualPlayerIds = new Set((leaguePlayersRows ?? []).map((r) => r.player_id))
+  // リーグ未参加のプレイヤー（追加ドロップダウン用）
+  const addablePlayers = (allPlayers ?? []).filter((p) => !leaguePlayerMap[p.id])
 
   // 招待リンク
   const { data: invite } = await supabase
@@ -290,6 +346,7 @@ export default async function LeaguePage({
   const settingsAction = updateLeagueSettings.bind(null, id)
   const generateInviteAction = generateInvite.bind(null, id)
   const deleteLeagueAction = deleteLeague.bind(null, id)
+  const addLeaguePlayerAction = addLeaguePlayer.bind(null, id)
 
   return (
     <div>
@@ -838,6 +895,65 @@ export default async function LeaguePage({
               </button>
             </div>
           </form>
+
+          {/* プレイヤー管理 */}
+          <div className="mt-6 bg-white rounded-xl border border-warm-border p-6 max-w-lg shadow-sm">
+            <h2 className="text-base font-semibold text-green-deep mb-1">プレイヤー</h2>
+            <p className="text-xs text-warm-gray mb-4">
+              対局に登録されると自動追加されます。対局前でも手動で追加できます。
+            </p>
+
+            {/* 現在のプレイヤー一覧 */}
+            {inputPlayers.length > 0 ? (
+              <ul className="space-y-2 mb-5">
+                {inputPlayers.map((p) => {
+                  const isManual = manualPlayerIds.has(p.player_id)
+                  const removeAction = removeLeaguePlayer.bind(null, id, p.player_id)
+                  return (
+                    <li key={p.player_id} className="flex items-center justify-between gap-2 py-1.5 border-b border-cream last:border-0">
+                      <span className="text-sm text-gray-800">{p.players?.name}</span>
+                      <div className="flex items-center gap-2 flex-none">
+                        {p.fromGame ? (
+                          <span className="text-xs text-warm-gray bg-cream border border-warm-border px-2 py-0.5 rounded-full">対局あり</span>
+                        ) : (
+                          <>
+                            <span className="text-xs text-green-deep bg-green-light border border-green-mid/30 px-2 py-0.5 rounded-full">手動追加</span>
+                            <form action={removeAction}>
+                              <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors">削除</button>
+                            </form>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="text-xs text-warm-gray mb-4">まだプレイヤーがいません。</p>
+            )}
+
+            {/* プレイヤー追加フォーム */}
+            {addablePlayers.length > 0 && (
+              <form action={addLeaguePlayerAction} className="flex gap-2">
+                <select
+                  name="player_id"
+                  required
+                  className="flex-1 border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
+                >
+                  <option value="">プレイヤーを選択</option>
+                  {addablePlayers.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  className="flex-none bg-green-deep text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
+                >
+                  追加
+                </button>
+              </form>
+            )}
+          </div>
 
           {/* 招待リンク */}
           <div className="mt-6 bg-white rounded-xl border border-warm-border p-6 max-w-lg shadow-sm">
