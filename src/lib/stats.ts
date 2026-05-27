@@ -17,8 +17,12 @@ export type PlayerStat = {
   avgScore: number
   avgRank: number
   topCount: number
+  secondCount: number
+  thirdCount: number
   lastCount: number
   topRate: number
+  secondRate: number
+  thirdRate: number
   lastRate: number
   totalPoints: number | null
   avgPoints: number | null
@@ -56,8 +60,12 @@ export function calcPlayerStats(
           avgScore: 0,
           avgRank: 0,
           topCount: 0,
+          secondCount: 0,
+          thirdCount: 0,
           lastCount: 0,
           topRate: 0,
+          secondRate: 0,
+          thirdRate: 0,
           lastRate: 0,
           totalPoints: rule ? 0 : null,
           avgPoints: rule ? 0 : null,
@@ -71,6 +79,8 @@ export function calcPlayerStats(
       s.totalScore += result.score
       s.avgRank = (prevRankTotal + result.rank) / s.games
       if (result.rank === 1) s.topCount++
+      if (result.rank === 2) s.secondCount++
+      if (result.rank === 3) s.thirdCount++
       if (result.rank === 4) s.lastCount++
 
       // ポイント計算: (素点 - 返し点) / 1000 + ウマ + オカ(1位のみ)
@@ -100,6 +110,8 @@ export function calcPlayerStats(
       avgScore: s.games > 0 ? Math.round(s.totalScore / s.games) : 0,
       avgRank: Math.round(s.avgRank * 100) / 100,
       topRate: s.games > 0 ? Math.round((s.topCount / s.games) * 100) : 0,
+      secondRate: s.games > 0 ? Math.round((s.secondCount / s.games) * 100) : 0,
+      thirdRate: s.games > 0 ? Math.round((s.thirdCount / s.games) * 100) : 0,
       lastRate: s.games > 0 ? Math.round((s.lastCount / s.games) * 100) : 0,
       totalPoints: s.totalPoints !== null ? Math.round(s.totalPoints * 10) / 10 : null,
       avgPoints:

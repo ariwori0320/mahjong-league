@@ -1,147 +1,80 @@
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { calcPlayerStats, LeagueRule } from '@/lib/stats'
-import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
-import CounterInputForm from '@/components/CounterInputForm'
-import CopyTokenLink from '@/components/CopyTokenLink'
+import { Suspense } from 'react'
+import { LeagueRule } from '@/lib/stats'
+import LeagueTabContent from './TabContent'
 
-// ── サーバーアクション ──────────────────────────────────────────
+// ── Suspense フォールバック（タブ切り替え時のスケルトン） ─────
 
-/**
- * カウンターを league_day_counters に日単位で保存する
- */
-async function saveCounters(leagueId: string, date: string, formData: FormData) {
-  'use server'
-
-  // その日の既存カウンターを削除
-  await supabase
-    .from('league_day_counters')
-    .delete()
-    .eq('league_id', leagueId)
-    .eq('date', date)
-
-  // FormData のキーは `${player_id}_${counter_type_id}` 形式（UUID_UUID）
-  // UUID はハイフンのみ含む（アンダースコアなし）→ split('_') で正確に2分割される
-  const inserts: {
-    league_id: string
-    player_id: string
-    counter_type_id: string
-    date: string
-    count: number
-  }[] = []
-
-  for (const [key, value] of formData.entries()) {
-    const count = parseInt(value as string) || 0
-    if (count <= 0) continue
-    const parts = key.split('_')
-    if (parts.length !== 2) continue
-    const [player_id, counter_type_id] = parts
-    inserts.push({ league_id: leagueId, player_id, counter_type_id, date, count })
+function TabSkeleton({ tab }: { tab: string }) {
+  if (tab === 'stats') {
+    return (
+      <div className="animate-pulse">
+        <div className="h-[76px] bg-white rounded-xl border border-warm-border mb-5" />
+        <div className="bg-white rounded-xl border border-warm-border overflow-hidden shadow-sm">
+          <div className="h-11 bg-gray-100" />
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="h-12 border-t border-warm-border flex items-center px-4 gap-6"
+            >
+              <div className="h-4 w-20 bg-gray-100 rounded" />
+              <div className="h-4 w-6 bg-gray-100 rounded ml-auto" />
+              <div className="h-4 w-10 bg-gray-100 rounded" />
+              <div className="h-4 w-10 bg-gray-100 rounded" />
+              <div className="h-4 w-10 bg-gray-100 rounded" />
+              <div className="h-4 w-10 bg-gray-100 rounded" />
+              <div className="h-4 w-10 bg-gray-100 rounded" />
+              <div className="h-4 w-12 bg-gray-100 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
-  if (inserts.length > 0) {
-    await supabase.from('league_day_counters').insert(inserts)
+  if (tab === 'settings') {
+    return (
+      <div className="animate-pulse">
+        <div className="bg-white rounded-xl border border-warm-border p-6 max-w-lg space-y-5 shadow-sm">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-10 bg-gray-100 rounded-lg" />
+          ))}
+          <div className="h-10 w-24 bg-gray-200 rounded-lg" />
+        </div>
+      </div>
+    )
   }
 
-  revalidatePath(`/leagues/${leagueId}`)
-  redirect(`/leagues/${leagueId}?tab=input&saved=1&date=${date}`)
+  // games / input
+  return (
+    <div className="animate-pulse space-y-6">
+      {[1, 2].map((i) => (
+        <div key={i}>
+          <div className="h-5 w-40 bg-gray-100 rounded mb-2 mx-1" />
+          <div className="bg-white rounded-xl border border-warm-border overflow-hidden shadow-sm">
+            {[1, 2].map((j) => (
+              <div
+                key={j}
+                className={`h-16 flex items-center px-3 gap-3 ${
+                  j > 1 ? 'border-t border-warm-border' : ''
+                }`}
+              >
+                <div className="h-4 w-8 bg-gray-100 rounded" />
+                <div className="grid grid-cols-4 gap-1.5 flex-1">
+                  {[1, 2, 3, 4].map((k) => (
+                    <div key={k} className="h-12 bg-gray-100 rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
-
-/**
- * 招待リンクのトークンを生成（既存のものは上書き）
- */
-async function generateInvite(leagueId: string) {
-  'use server'
-  // 既存トークンを削除して再生成
-  await supabase.from('league_invites').delete().eq('league_id', leagueId)
-  await supabase.from('league_invites').insert({ league_id: leagueId })
-  revalidatePath(`/leagues/${leagueId}`)
-  redirect(`/leagues/${leagueId}?tab=settings`)
-}
-
-/**
- * リーグの設定（基本情報 + ポイントルール）を更新する
- */
-async function updateLeagueSettings(leagueId: string, formData: FormData) {
-  'use server'
-  const name = (formData.get('name') as string ?? '').trim()
-  if (!name) throw new Error('リーグ名は必須です')
-
-  const toStr = (key: string) => (formData.get(key) as string || null)
-  const toInt = (key: string) => {
-    const v = (formData.get(key) as string ?? '').trim()
-    return v !== '' ? parseInt(v, 10) : null
-  }
-
-  const uma_1 = toInt('uma_1')
-  const uma_2 = toInt('uma_2')
-  const uma_3 = uma_2 !== null ? -uma_2 : null
-  const uma_4 = uma_1 !== null ? -uma_1 : null
-  const starting_points = toInt('starting_points')
-  const return_points = toInt('return_points')
-
-  await supabase
-    .from('leagues')
-    .update({
-      name,
-      start_date: toStr('start_date'),
-      end_date: toStr('end_date'),
-      notes: toStr('notes'),
-      uma_1, uma_2, uma_3, uma_4, starting_points, return_points,
-    })
-    .eq('id', leagueId)
-
-  revalidatePath(`/leagues/${leagueId}`)
-  revalidatePath('/leagues')
-  redirect(`/leagues/${leagueId}?tab=settings&saved=1`)
-}
-
-/**
- * リーグにプレイヤーを手動追加する
- */
-async function addLeaguePlayer(leagueId: string, formData: FormData) {
-  'use server'
-  const playerId = formData.get('player_id') as string
-  if (!playerId) return
-  await supabase
-    .from('league_players')
-    .upsert({ league_id: leagueId, player_id: playerId })
-  revalidatePath(`/leagues/${leagueId}`)
-  redirect(`/leagues/${leagueId}?tab=settings`)
-}
-
-/**
- * リーグから手動追加プレイヤーを削除する
- */
-async function removeLeaguePlayer(leagueId: string, playerId: string) {
-  'use server'
-  await supabase
-    .from('league_players')
-    .delete()
-    .eq('league_id', leagueId)
-    .eq('player_id', playerId)
-  revalidatePath(`/leagues/${leagueId}`)
-  redirect(`/leagues/${leagueId}?tab=settings`)
-}
-
-/**
- * リーグを削除する
- */
-async function deleteLeague(leagueId: string) {
-  'use server'
-  await supabase.from('leagues').delete().eq('id', leagueId)
-  revalidatePath('/leagues')
-  redirect('/leagues')
-}
-
-// ── 定数 ──────────────────────────────────────────────────────
-
-const rankLabel = ['🥇', '🥈', '🥉', '④']
-
-const inputClass =
-  'w-full border border-warm-border rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-green-mid focus:ring-1 focus:ring-green-mid transition-colors'
 
 // ── ページ ────────────────────────────────────────────────────
 
@@ -167,41 +100,19 @@ export default async function LeaguePage({
     to: statsTo,
   } = await searchParams
 
-  // ── データ取得（全クエリ並列実行） ──────────────────────────
-
-  const [
-    { data: league },
-    { data: games },
-    { data: counterTypes },
-    { data: allDayCounters },
-    settingsData,
-  ] = await Promise.all([
+  // ── ヘッダー用に最小限のデータを並列取得（高速） ────────────
+  const [{ data: league }, { count: gameCount }] = await Promise.all([
     supabase.from('leagues').select('*').eq('id', id).single(),
-    supabase.from('games')
-      .select('*, game_results(player_id, score, rank, players(id, name))')
-      .eq('league_id', id)
-      .order('played_at', { ascending: false }),
-    supabase.from('counter_types').select('*').order('created_at'),
-    supabase.from('league_day_counters')
-      .select('player_id, counter_type_id, count, date')
+    supabase
+      .from('games')
+      .select('id', { count: 'exact', head: true })
       .eq('league_id', id),
-    // 設定タブのみ追加クエリを実行
-    tab === 'settings'
-      ? Promise.all([
-          supabase.from('league_players').select('player_id, players(id, name)').eq('league_id', id),
-          supabase.from('players').select('id, name').order('name'),
-          supabase.from('league_invites').select('token').eq('league_id', id).maybeSingle(),
-        ])
-      : Promise.resolve(null),
   ])
 
   if (!league) notFound()
 
-  const leaguePlayersRows = settingsData ? (settingsData[0].data ?? []) : []
-  const allPlayers       = settingsData ? (settingsData[1].data ?? []) : []
-  const invite           = settingsData ? settingsData[2].data : null
+  const tabBase = `/leagues/${id}`
 
-  // ── ポイントルール ──────────────────────────────────────────
   const hasRule =
     league.uma_1 != null &&
     league.uma_2 != null &&
@@ -221,119 +132,9 @@ export default async function LeaguePage({
       }
     : null
 
-  // ── 成績集計：日付フィルター ────────────────────────────────
-  const getDate = (g: any) => (g.played_at as string).slice(0, 10)
-
-  const statsGames =
-    statsFrom || statsTo
-      ? (games ?? []).filter((g) => {
-          const d = getDate(g)
-          return (!statsFrom || d >= statsFrom) && (!statsTo || d <= statsTo)
-        })
-      : (games ?? [])
-
-  const statsCounters =
-    statsFrom || statsTo
-      ? (allDayCounters ?? []).filter((c) => {
-          const d = c.date as string
-          return (!statsFrom || d >= statsFrom) && (!statsTo || d <= statsTo)
-        })
-      : (allDayCounters ?? [])
-
-  const playerStats = calcPlayerStats(
-    statsGames,
-    counterTypes ?? [],
-    leagueRule,
-    statsCounters
-  )
-
-  const tabBase = `/leagues/${id}`
-
-  // ── 対局一覧：日付グループ ──────────────────────────────────
-  const gamesByDate: { date: string; dayGames: any[] }[] = []
-  const dateMap: Record<string, any[]> = {}
-  for (const g of games ?? []) {
-    const d = getDate(g)
-    if (!dateMap[d]) {
-      dateMap[d] = []
-      gamesByDate.push({ date: d, dayGames: dateMap[d] })
-    }
-    dateMap[d].push(g)
-  }
-  for (const group of gamesByDate) {
-    group.dayGames.sort((a, b) =>
-      (a.played_at as string).localeCompare(b.played_at as string)
-    )
-  }
-
-  // ── カウンター入力タブ ──────────────────────────────────────
-
-  // 記録済み日付一覧（降順）
-  const counterDates = [
-    ...new Set((allDayCounters ?? []).map((c) => c.date as string)),
-  ].sort().reverse()
-
-  // デフォルト: 今日の日付
-  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10)
-
-  const activeDate = selectedDate ?? counterDates[0] ?? today
-
-  // その日のカウンター（初期値）
-  const activeDayCounters = (allDayCounters ?? []).filter(
-    (c) => c.date === activeDate
-  )
-  const inputCounterMap: Record<string, number> = {}
-  for (const c of activeDayCounters) {
-    inputCounterMap[`${c.player_id}_${c.counter_type_id}`] = c.count
-  }
-
-  // プレイヤーリスト：対局参加者 ∪ 手動追加（設定タブ・カウンター入力で使用）
-  const leaguePlayerMap: Record<
-    string,
-    { player_id: string; rank: number; players: { name: string } | null; fromGame: boolean }
-  > = {}
-  for (const game of games ?? []) {
-    for (const result of (game.game_results as any[]) ?? []) {
-      if (result.players) {
-        leaguePlayerMap[result.player_id] = {
-          player_id: result.player_id,
-          rank: 0,
-          players: result.players,
-          fromGame: true,
-        }
-      }
-    }
-  }
-  for (const row of leaguePlayersRows ?? []) {
-    if (!leaguePlayerMap[row.player_id]) {
-      leaguePlayerMap[row.player_id] = {
-        player_id: row.player_id,
-        rank: 0,
-        players: (row.players as any) ?? null,
-        fromGame: false,
-      }
-    }
-  }
-  const inputPlayers = Object.values(leaguePlayerMap).sort((a, b) =>
-    (a.players?.name ?? '').localeCompare(b.players?.name ?? '', 'ja')
-  )
-
-  // 手動追加済みのID集合
-  const manualPlayerIds = new Set((leaguePlayersRows ?? []).map((r) => r.player_id))
-  // リーグ未参加のプレイヤー（追加ドロップダウン用）
-  const addablePlayers = (allPlayers ?? []).filter((p) => !leaguePlayerMap[p.id])
-
-  const inputAction = saveCounters.bind(null, id, activeDate)
-  const settingsAction = updateLeagueSettings.bind(null, id)
-  const generateInviteAction = generateInvite.bind(null, id)
-  const deleteLeagueAction = deleteLeague.bind(null, id)
-  const addLeaguePlayerAction = addLeaguePlayer.bind(null, id)
-
   return (
     <div>
-      {/* ── ヘッダー ──────────────────────────────────────────── */}
+      {/* ── ヘッダー（即時表示） ──────────────────────────────── */}
       <div className="mb-6">
         <Link
           href="/leagues"
@@ -349,7 +150,7 @@ export default async function LeaguePage({
             </span>
           )}
           <span className="text-xs text-warm-gray bg-white border border-warm-border px-2 py-0.5 rounded-full">
-            {games?.length ?? 0}戦
+            {gameCount ?? 0}戦
           </span>
           {hasRule && (
             <span className="text-xs text-green-deep bg-green-light border border-green-mid/30 px-2 py-0.5 rounded-full">
@@ -361,7 +162,7 @@ export default async function LeaguePage({
         {league.notes && <p className="text-sm text-gray-500 mt-2">{league.notes}</p>}
       </div>
 
-      {/* ── タブ ─────────────────────────────────────────────── */}
+      {/* ── タブ（即時表示） ─────────────────────────────────── */}
       <div className="flex gap-1 mb-6 border-b border-warm-border overflow-x-auto">
         {[
           { key: 'games', label: '対局一覧', href: tabBase },
@@ -383,610 +184,21 @@ export default async function LeaguePage({
         ))}
       </div>
 
-      {/* ── 対局一覧タブ ─────────────────────────────────────── */}
-      {tab === 'games' && (
-        <div>
-          <div className="flex justify-end mb-4">
-            <Link
-              href={`/leagues/${id}/games/new`}
-              className="bg-green-deep text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors shadow-sm"
-            >
-              ＋ 対局を追加
-            </Link>
-          </div>
-
-          {!games?.length ? (
-            <div className="bg-white rounded-xl border border-warm-border p-10 text-center">
-              <p className="text-warm-gray text-sm">対局がまだありません。</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {gamesByDate.map(({ date, dayGames }) => (
-                <div key={date}>
-                  {/* 日付ヘッダー */}
-                  <div className="flex items-center gap-3 mb-2 px-1">
-                    <h3 className="font-semibold text-green-deep text-sm">
-                      {new Date(date + 'T00:00:00').toLocaleDateString('ja-JP', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        weekday: 'short',
-                      })}
-                    </h3>
-                    <span className="text-xs text-warm-gray bg-white border border-warm-border px-2 py-0.5 rounded-full">
-                      {dayGames.length}局
-                    </span>
-                  </div>
-
-                  {/* その日の対局リスト */}
-                  <div className="bg-white rounded-xl border border-warm-border overflow-hidden shadow-sm">
-                    {dayGames.map((game, gameIndex) => (
-                      <Link
-                        key={game.id}
-                        href={`/games/${game.id}`}
-                        className={`block p-3 hover:bg-green-light/50 transition-colors group ${
-                          gameIndex > 0 ? 'border-t border-warm-border' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-warm-gray flex-none w-8 text-center">
-                            第{gameIndex + 1}局
-                          </span>
-                          <div className="grid grid-cols-4 gap-1.5 flex-1">
-                            {(game.game_results as any[])
-                              ?.sort((a: any, b: any) => a.rank - b.rank)
-                              .map((result: any, i: number) => (
-                                <div
-                                  key={result.player_id}
-                                  className="text-center bg-green-light rounded-lg py-1.5 px-1"
-                                >
-                                  <div className="text-sm leading-none">{rankLabel[i]}</div>
-                                  <div className="text-xs font-semibold text-gray-800 mt-0.5 truncate">
-                                    {result.players?.name}
-                                  </div>
-                                  <div className="text-xs text-warm-gray mt-0.5">
-                                    {result.score.toLocaleString()}
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                          <span className="text-xs text-green-mid group-hover:text-vermilion transition-colors flex-none">
-                            ›
-                          </span>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── 成績集計タブ ─────────────────────────────────────── */}
-      {tab === 'stats' && (
-        <div>
-          {/* 日付フィルター */}
-          <div className="bg-white rounded-xl border border-warm-border p-4 mb-5 shadow-sm">
-            <form method="GET" action={tabBase}>
-              <input type="hidden" name="tab" value="stats" />
-              <div className="flex flex-wrap items-end gap-3">
-                <div>
-                  <label className="block text-xs text-warm-gray mb-1">開始日</label>
-                  <input
-                    type="date"
-                    name="from"
-                    defaultValue={statsFrom ?? ''}
-                    className="border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
-                  />
-                </div>
-                <span className="text-warm-gray pb-2 text-sm">〜</span>
-                <div>
-                  <label className="block text-xs text-warm-gray mb-1">終了日</label>
-                  <input
-                    type="date"
-                    name="to"
-                    defaultValue={statsTo ?? ''}
-                    className="border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-deep text-white rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
-                  >
-                    絞り込む
-                  </button>
-                  {(statsFrom || statsTo) && (
-                    <Link
-                      href={`${tabBase}?tab=stats`}
-                      className="px-4 py-2 border border-warm-border rounded-lg text-sm text-warm-gray hover:bg-cream transition-colors"
-                    >
-                      全期間
-                    </Link>
-                  )}
-                </div>
-              </div>
-              {(statsFrom || statsTo) && (
-                <p className="text-xs text-green-deep mt-2 font-medium">
-                  絞り込み中: {statsFrom ?? '〜'} 〜 {statsTo ?? '現在'}（{statsGames.length}局）
-                </p>
-              )}
-            </form>
-          </div>
-
-          {!playerStats.length ? (
-            <div className="bg-white rounded-xl border border-warm-border p-10 text-center">
-              <p className="text-warm-gray text-sm">
-                {statsFrom || statsTo
-                  ? '指定期間に対局データがありません。'
-                  : 'まだ対局データがありません。'}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl border border-warm-border overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-green-deep text-white">
-                      <th className="text-left px-4 py-3 font-medium whitespace-nowrap sticky left-0 bg-green-deep">
-                        プレイヤー
-                      </th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">対局数</th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">平均順位</th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">1位率</th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">4位率</th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">平均点</th>
-                      {leagueRule && (
-                        <th className="text-center px-3 py-3 font-medium whitespace-nowrap border-l border-green-mid/50">
-                          ポイント
-                        </th>
-                      )}
-                      {counterTypes?.map((ct) => (
-                        <th
-                          key={ct.id}
-                          className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l border-green-mid/30"
-                        >
-                          {ct.name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {playerStats.map((stat, i) => (
-                      <tr
-                        key={stat.id}
-                        className={`border-t border-cream hover:bg-cream/50 transition-colors ${
-                          i === 0 ? 'font-medium' : ''
-                        }`}
-                      >
-                        <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white">
-                          <Link
-                            href={`/players/${stat.id}`}
-                            className="text-green-deep hover:text-vermilion hover:underline transition-colors"
-                          >
-                            {stat.name}
-                          </Link>
-                        </td>
-                        <td className="text-center px-3 py-3 text-warm-gray">{stat.games}</td>
-                        <td className="text-center px-3 py-3">
-                          <span
-                            className={`font-semibold ${
-                              stat.avgRank <= 2 ? 'text-green-deep' : 'text-gray-700'
-                            }`}
-                          >
-                            {stat.avgRank.toFixed(2)}
-                          </span>
-                        </td>
-                        <td className="text-center px-3 py-3">
-                          <span
-                            className={`font-semibold ${
-                              stat.topRate >= 30 ? 'text-vermilion' : 'text-gray-700'
-                            }`}
-                          >
-                            {stat.topRate}%
-                          </span>
-                        </td>
-                        <td className="text-center px-3 py-3">
-                          <span
-                            className={stat.lastRate >= 30 ? 'text-vermilion' : 'text-gray-500'}
-                          >
-                            {stat.lastRate}%
-                          </span>
-                        </td>
-                        <td className="text-center px-3 py-3 text-gray-700">
-                          {stat.avgScore.toLocaleString()}
-                        </td>
-                        {leagueRule && (
-                          <td className="text-center px-3 py-3 border-l border-cream">
-                            {stat.totalPoints !== null ? (
-                              <span
-                                className={`font-bold text-base ${
-                                  stat.totalPoints >= 0 ? 'text-green-deep' : 'text-vermilion'
-                                }`}
-                              >
-                                {stat.totalPoints >= 0 ? '+' : ''}
-                                {stat.totalPoints.toFixed(1)}
-                              </span>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </td>
-                        )}
-                        {counterTypes?.map((ct) => (
-                          <td key={ct.id} className="text-center px-3 py-3 border-l border-cream">
-                            <span
-                              className={
-                                (stat.counters[ct.id] ?? 0) > 0
-                                  ? 'text-gray-800 font-medium'
-                                  : 'text-gray-300'
-                              }
-                            >
-                              {stat.counters[ct.id] ?? 0}
-                            </span>
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── カウンター入力タブ ───────────────────────────────── */}
-      {tab === 'input' && (
-        <div>
-          {saved && (
-            <div className="mb-5 bg-green-light border border-green-mid/30 rounded-xl px-4 py-3 flex items-center gap-2">
-              <span className="text-lg">✓</span>
-              <span className="text-sm font-medium text-green-deep">カウンターを保存しました</span>
-            </div>
-          )}
-
-          {/* 日付入力フォーム */}
-          <div className="mb-4">
-            <form method="GET" action={tabBase} className="flex items-end gap-2">
-              <input type="hidden" name="tab" value="input" />
-              <div className="flex-1 max-w-xs">
-                <label className="block text-xs text-warm-gray mb-1">日付</label>
-                <input
-                  type="date"
-                  name="date"
-                  defaultValue={activeDate}
-                  className={inputClass}
-                />
-              </div>
-              <button
-                type="submit"
-                className="px-4 py-2.5 bg-green-deep text-white rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
-              >
-                表示
-              </button>
-            </form>
-          </div>
-
-          {/* 記録済み日付のクイック選択 */}
-          {counterDates.length > 0 && (
-            <div className="mb-5 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-warm-gray">記録済み:</span>
-              {counterDates.slice(0, 8).map((d) => (
-                <Link
-                  key={d}
-                  href={`${tabBase}?tab=input&date=${d}`}
-                  className={`flex-none px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                    d === activeDate
-                      ? 'bg-green-deep text-white border-green-deep'
-                      : 'bg-white border-warm-border text-warm-gray hover:border-green-mid hover:text-green-deep'
-                  }`}
-                >
-                  {new Date(d + 'T00:00:00').toLocaleDateString('ja-JP', {
-                    month: 'numeric',
-                    day: 'numeric',
-                  })}
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {/* 現在の日付表示 */}
-          <p className="text-sm font-semibold text-green-deep mb-4">
-            {new Date(activeDate + 'T00:00:00').toLocaleDateString('ja-JP', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              weekday: 'short',
-            })}
-          </p>
-
-          {inputPlayers.length === 0 ? (
-            <div className="bg-white rounded-xl border border-warm-border p-10 text-center">
-              <p className="text-warm-gray text-sm">
-                対局を登録するとプレイヤーが表示されます。
-              </p>
-              <Link
-                href={`/leagues/${id}/games/new`}
-                className="inline-block mt-3 text-sm text-green-deep underline"
-              >
-                対局を追加する →
-              </Link>
-            </div>
-          ) : (
-            <CounterInputForm
-              players={inputPlayers}
-              counterTypes={counterTypes ?? []}
-              initialValues={inputCounterMap}
-              action={inputAction}
-            />
-          )}
-        </div>
-      )}
-
-      {/* ── 設定タブ ─────────────────────────────────────────── */}
-      {tab === 'settings' && (
-        <div>
-          {saved && (
-            <div className="mb-5 bg-green-light border border-green-mid/30 rounded-xl px-4 py-3 flex items-center gap-2">
-              <span className="text-lg">✓</span>
-              <span className="text-sm font-medium text-green-deep">設定を保存しました</span>
-            </div>
-          )}
-
-          <form
-            action={settingsAction}
-            className="bg-white rounded-xl border border-warm-border p-6 space-y-6 max-w-lg shadow-sm"
-          >
-            {/* 基本情報 */}
-            <div>
-              <h2 className="text-base font-semibold text-green-deep mb-4">基本情報</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    リーグ名 <span className="text-vermilion">*</span>
-                  </label>
-                  <input
-                    name="name"
-                    required
-                    defaultValue={league.name ?? ''}
-                    className={inputClass}
-                    placeholder="例: 2026年春リーグ"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-warm-gray mb-1">開始日</label>
-                    <input
-                      name="start_date"
-                      type="date"
-                      defaultValue={league.start_date ?? ''}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-warm-gray mb-1">終了日</label>
-                    <input
-                      name="end_date"
-                      type="date"
-                      defaultValue={league.end_date ?? ''}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-warm-gray mb-1">備考</label>
-                  <textarea
-                    name="notes"
-                    rows={2}
-                    defaultValue={league.notes ?? ''}
-                    className={inputClass}
-                    placeholder="メモなど"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <hr className="border-warm-border" />
-
-            <div>
-              <h2 className="text-base font-semibold text-green-deep mb-1">ポイントルール</h2>
-              <p className="text-xs text-warm-gray">
-                設定すると成績集計にポイントが表示されます。空欄にするとポイント非表示になります。
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">ウマ</label>
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div>
-                  <label className="block text-xs text-warm-gray mb-1">1位ウマ</label>
-                  <input
-                    name="uma_1"
-                    type="number"
-                    defaultValue={league.uma_1 ?? ''}
-                    placeholder="20"
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-warm-gray mb-1">2位ウマ</label>
-                  <input
-                    name="uma_2"
-                    type="number"
-                    defaultValue={league.uma_2 ?? ''}
-                    placeholder="10"
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-warm-gray">
-                3位・4位は自動でマイナス（例: 1位=20・2位=10 → 3位 −10、4位 −20）
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">点数設定</label>
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div>
-                  <label className="block text-xs text-warm-gray mb-1">持ち点</label>
-                  <input
-                    name="starting_points"
-                    type="number"
-                    defaultValue={league.starting_points ?? ''}
-                    placeholder="25000"
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-warm-gray mb-1">返し点</label>
-                  <input
-                    name="return_points"
-                    type="number"
-                    defaultValue={league.return_points ?? ''}
-                    placeholder="30000"
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-warm-gray">
-                ポイント計算式: (素点 − 返し点) ÷ 1000 + ウマ
-              </p>
-            </div>
-
-            {hasRule && (
-              <div className="bg-green-light rounded-lg px-4 py-3 text-sm">
-                <p className="font-medium text-green-deep mb-1">現在の設定</p>
-                <p className="text-xs text-gray-600">
-                  ウマ: 1位 +{league.uma_1} / 2位 +{league.uma_2} / 3位 {league.uma_3} / 4位{' '}
-                  {league.uma_4}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {league.starting_points?.toLocaleString()}点持ち{' '}
-                  {league.return_points?.toLocaleString()}点返し
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-1">
-              <button
-                type="submit"
-                className="bg-green-deep text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors shadow-sm"
-              >
-                保存する
-              </button>
-            </div>
-          </form>
-
-          {/* プレイヤー管理 */}
-          <div className="mt-6 bg-white rounded-xl border border-warm-border p-6 max-w-lg shadow-sm">
-            <h2 className="text-base font-semibold text-green-deep mb-1">プレイヤー</h2>
-            <p className="text-xs text-warm-gray mb-4">
-              対局に登録されると自動追加されます。対局前でも手動で追加できます。
-            </p>
-
-            {/* 現在のプレイヤー一覧 */}
-            {inputPlayers.length > 0 ? (
-              <ul className="space-y-2 mb-5">
-                {inputPlayers.map((p) => {
-                  const isManual = manualPlayerIds.has(p.player_id)
-                  const removeAction = removeLeaguePlayer.bind(null, id, p.player_id)
-                  return (
-                    <li key={p.player_id} className="flex items-center justify-between gap-2 py-1.5 border-b border-cream last:border-0">
-                      <span className="text-sm text-gray-800">{p.players?.name}</span>
-                      <div className="flex items-center gap-2 flex-none">
-                        {p.fromGame ? (
-                          <span className="text-xs text-warm-gray bg-cream border border-warm-border px-2 py-0.5 rounded-full">対局あり</span>
-                        ) : (
-                          <>
-                            <span className="text-xs text-green-deep bg-green-light border border-green-mid/30 px-2 py-0.5 rounded-full">手動追加</span>
-                            <form action={removeAction}>
-                              <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors">削除</button>
-                            </form>
-                          </>
-                        )}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              <p className="text-xs text-warm-gray mb-4">まだプレイヤーがいません。</p>
-            )}
-
-            {/* プレイヤー追加フォーム */}
-            {addablePlayers.length > 0 && (
-              <form action={addLeaguePlayerAction} className="flex gap-2">
-                <select
-                  name="player_id"
-                  required
-                  className="flex-1 border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
-                >
-                  <option value="">プレイヤーを選択</option>
-                  {addablePlayers.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                <button
-                  type="submit"
-                  className="flex-none bg-green-deep text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
-                >
-                  追加
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* 招待リンク */}
-          <div className="mt-6 bg-white rounded-xl border border-warm-border p-6 max-w-lg shadow-sm">
-            <h2 className="text-base font-semibold text-green-deep mb-1">メンバー招待</h2>
-            <p className="text-xs text-warm-gray mb-4">
-              招待リンクを共有すると、相手がログイン後にこのリーグのメンバーに自動追加されます。
-            </p>
-
-            {invite?.token ? (
-              <div className="space-y-3">
-                <CopyTokenLink path={`/invite/${invite.token}`} />
-                <form action={generateInviteAction}>
-                  <button
-                    type="submit"
-                    className="text-xs text-warm-gray hover:text-vermilion transition-colors underline"
-                  >
-                    リンクを再生成する
-                  </button>
-                </form>
-              </div>
-            ) : (
-              <form action={generateInviteAction}>
-                <button
-                  type="submit"
-                  className="bg-green-deep text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors shadow-sm"
-                >
-                  招待リンクを生成する
-                </button>
-              </form>
-            )}
-          </div>
-          {/* 削除セクション */}
-          <div className="mt-6 max-w-lg">
-            <div className="border border-red-200 rounded-xl p-5 bg-red-50">
-              <h3 className="text-sm font-semibold text-red-700 mb-1">リーグを削除する</h3>
-              <p className="text-xs text-red-600 mb-4">
-                削除すると元に戻せません。このリーグの対局・成績・カウンターデータがすべて削除されます。
-              </p>
-              <form action={deleteLeagueAction}>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  このリーグを削除する
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── タブコンテンツ（Suspense でストリーミング） ──────── */}
+      {/* タブをクリックすると即座にスケルトンが表示され、データ読み込み後にコンテンツが現れる */}
+      <Suspense fallback={<TabSkeleton tab={tab} />}>
+        <LeagueTabContent
+          id={id}
+          tab={tab}
+          league={league}
+          hasRule={hasRule}
+          leagueRule={leagueRule}
+          selectedDate={selectedDate}
+          saved={saved}
+          statsFrom={statsFrom}
+          statsTo={statsTo}
+        />
+      </Suspense>
     </div>
   )
 }
