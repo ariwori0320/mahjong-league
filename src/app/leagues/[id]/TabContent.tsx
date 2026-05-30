@@ -664,6 +664,21 @@ export default async function LeagueTabContent({
               </p>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">同着のウマ処理</label>
+              <select
+                name="tie_rule"
+                defaultValue={league.tie_rule ?? 'order'}
+                className={inputClass}
+              >
+                <option value="order">入力順（上の欄を優先）</option>
+                <option value="split">按分（ウマ・オカを均等に分ける）</option>
+              </select>
+              <p className="text-xs text-warm-gray mt-1.5">
+                同点プレイヤーが複数いた場合の順位点の扱いを設定します
+              </p>
+            </div>
+
             {hasRule && (
               <div className="bg-green-light rounded-lg px-4 py-3 text-sm">
                 <p className="font-medium text-green-deep mb-1">現在の設定</p>
@@ -674,6 +689,9 @@ export default async function LeagueTabContent({
                 <p className="text-xs text-gray-600">
                   {league.starting_points?.toLocaleString()}点持ち{' '}
                   {league.return_points?.toLocaleString()}点返し
+                </p>
+                <p className="text-xs text-gray-600">
+                  同着処理: {league.tie_rule === 'split' ? '按分' : '入力順'}
                 </p>
               </div>
             )}

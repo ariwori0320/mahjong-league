@@ -70,6 +70,7 @@ export async function updateLeagueSettings(leagueId: string, formData: FormData)
   const uma_4 = uma_1 !== null ? -uma_1 : null
   const starting_points = toInt('starting_points')
   const return_points = toInt('return_points')
+  const tie_rule = (formData.get('tie_rule') as string) === 'split' ? 'split' : 'order'
 
   await supabase
     .from('leagues')
@@ -79,6 +80,7 @@ export async function updateLeagueSettings(leagueId: string, formData: FormData)
       end_date: toStr('end_date'),
       notes: toStr('notes'),
       uma_1, uma_2, uma_3, uma_4, starting_points, return_points,
+      tie_rule,
     })
     .eq('id', leagueId)
 

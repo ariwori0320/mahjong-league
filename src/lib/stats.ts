@@ -7,6 +7,7 @@ export type LeagueRule = {
   uma: [number, number, number, number]
   startingPoints: number
   returnPoints: number
+  tieRule: 'split' | 'order'
 }
 
 export type PlayerStat = {
@@ -85,12 +86,33 @@ export function calcPlayerStats(
 
       // ポイント計算: (素点 - 返し点) / 1000 + ウマ + オカ(1位のみ)
       // オカ = (返し点 - 持ち点) × 4 / 1000 を1位に加算してゼロサムを保つ
+      // 按分モード: 同点プレイヤーのウマ・オカを均等に分配する
       if (rule && s.totalPoints !== null) {
-        const oka =
-          result.rank === 1
-            ? (rule.returnPoints - rule.startingPoints) * 4 / 1000
-            : 0
-        const chip = (result.score - rule.returnPoints) / 1000 + rule.uma[result.rank - 1] + oka
+        const okaFull = (rule.returnPoints - rule.startingPoints) * 4 / 1000
+        let umaValue: number
+        let okaValue: number
+
+        if (rule.tieRule === 'split') {
+          // 同点グループを特定してウマ・オカを按分
+          const tiedGroup = (game.game_results as any[]).filter(
+            (r) => r.score === result.score
+          )
+          const tiedCount = tiedGroup.length
+          const tiedRanks = tiedGroup.map((r: any) => r.rank as number)
+          const umaSum = tiedRanks.reduce(
+            (sum: number, r: number) => sum + rule.uma[r - 1],
+            0
+          )
+          umaValue = umaSum / tiedCount
+          // タイグループに1位が含まれていればオカも按分
+          okaValue = tiedRanks.includes(1) ? okaFull / tiedCount : 0
+        } else {
+          // 入力順（従来の動作）
+          umaValue = rule.uma[result.rank - 1]
+          okaValue = result.rank === 1 ? okaFull : 0
+        }
+
+        const chip = (result.score - rule.returnPoints) / 1000 + umaValue + okaValue
         s.totalPoints += chip
       }
     }

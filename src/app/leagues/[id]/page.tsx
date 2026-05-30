@@ -129,6 +129,7 @@ export default async function LeaguePage({
         ],
         startingPoints: league.starting_points,
         returnPoints: league.return_points,
+        tieRule: (league.tie_rule ?? 'order') as 'split' | 'order',
       }
     : null
 
