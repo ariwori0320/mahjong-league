@@ -10,6 +10,12 @@ const notoSansJP = Noto_Sans_JP({ subsets: ["latin"], weight: ["400", "500", "70
 export const metadata: Metadata = {
   title: "麻雀リーグ管理",
   description: "麻雀リーグ成績管理",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "麻雀リーグ",
+  },
 };
 
 async function signOut() {

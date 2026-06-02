@@ -1,0 +1,18 @@
+{
+  "name": "麻雀リーグ管理",
+  "short_name": "麻雀リーグ",
+  "description": "麻雀リーグ成績管理アプリ",
+  "start_url": "/leagues",
+  "display": "standalone",
+  "background_color": "#0d1b2a",
+  "theme_color": "#2d4a3e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
