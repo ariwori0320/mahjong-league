@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: "麻雀リーグ管理",
   description: "麻雀リーグ成績管理",
   manifest: "/manifest.json",
+  icons: {
+    // Safari が <link rel="apple-touch-icon"> を確認する
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
