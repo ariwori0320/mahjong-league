@@ -15,6 +15,8 @@ import {
   removeLeaguePlayer,
   addCounterType,
   deleteCounterType,
+  hideCounterType,
+  showCounterType,
 } from './actions'
 
 // ── 定数 ──────────────────────────────────────────────────────
@@ -93,6 +95,7 @@ type FullData = {
   leaguePlayersRows: any[]
   allPlayers: any[]
   invite: any
+  hiddenCounterTypeIds: string[]
 }
 
 // ── メインコンポーネント ──────────────────────────────────────
@@ -160,7 +163,7 @@ export default function LeagueTabContent({
   const fetchAll = useCallback(async () => {
     setLoading(true)
     const supabase = getSupabaseBrowser()
-    const [g, ct, dc, lp, p, inv] = await Promise.all([
+    const [g, ct, dc, lp, p, inv, hidden] = await Promise.all([
       supabase
         .from('games')
         .select('*, game_results(player_id, score, rank, players(id, name))')
@@ -179,6 +182,10 @@ export default function LeagueTabContent({
       supabase.from('league_players').select('player_id, players(id, name)').eq('league_id', id),
       supabase.from('players').select('id, name').order('name'),
       supabase.from('league_invites').select('token').eq('league_id', id).maybeSingle(),
+      supabase
+        .from('league_counter_type_hidden')
+        .select('counter_type_id')
+        .eq('league_id', id),
     ])
     setD({
       games: g.data ?? [],
@@ -187,6 +194,7 @@ export default function LeagueTabContent({
       leaguePlayersRows: lp.data ?? [],
       allPlayers: p.data ?? [],
       invite: inv.data,
+      hiddenCounterTypeIds: (hidden.data ?? []).map((r: any) => r.counter_type_id),
     })
     setLoading(false)
   }, [id])
@@ -241,7 +249,11 @@ export default function LeagueTabContent({
   }
 
   // ── データ展開 ────────────────────────────────────────────
-  const { games, counterTypes, allDayCounters, leaguePlayersRows, allPlayers, invite } = d
+  const { games, counterTypes, allDayCounters, leaguePlayersRows, allPlayers, invite, hiddenCounterTypeIds } = d
+  const hiddenSet = new Set(hiddenCounterTypeIds)
+
+  // カウンター入力に表示する種類（外したものを除く）
+  const activeCounterTypes = counterTypes.filter((ct: any) => !hiddenSet.has(ct.id))
 
   const getDate = (g: any) => (g.played_at as string).slice(0, 10)
 
@@ -640,7 +652,7 @@ export default function LeagueTabContent({
           ) : (
             <CounterInputForm
               players={inputPlayers}
-              counterTypes={counterTypes}
+              counterTypes={activeCounterTypes}
               initialValues={inputCounterMap}
               action={inputAction}
             />
@@ -817,14 +829,41 @@ export default function LeagueTabContent({
                   {items.map((ct: any) => {
                     const isOwn = ct.league_id === id
                     const isCore = ct.league_id === null && ct.name === '局数'
+                    const isHidden = hiddenSet.has(ct.id)
                     const delAction = deleteCounterType.bind(null, id, ct.id)
+                    const hideAction = hideCounterType.bind(null, id, ct.id)
+                    const showAction = showCounterType.bind(null, id, ct.id)
                     return (
-                      <li key={ct.id} className="flex items-center justify-between gap-2 py-2 border-b border-cream last:border-0">
+                      <li
+                        key={ct.id}
+                        className={`flex items-center justify-between gap-2 py-2 border-b border-cream last:border-0 ${isHidden ? 'opacity-50' : ''}`}
+                      >
                         <span className="text-sm text-gray-800">{ct.name}</span>
                         <div className="flex items-center gap-2 flex-none">
+                          {/* 追加 / 外す */}
+                          {isHidden ? (
+                            <form action={showAction}>
+                              <button
+                                type="submit"
+                                className="text-xs text-green-deep border border-green-deep px-2 py-0.5 rounded hover:bg-green-light transition-colors"
+                              >
+                                追加
+                              </button>
+                            </form>
+                          ) : (
+                            <form action={hideAction}>
+                              <button
+                                type="submit"
+                                className="text-xs text-warm-gray border border-warm-border px-2 py-0.5 rounded hover:bg-cream transition-colors"
+                              >
+                                外す
+                              </button>
+                            </form>
+                          )}
+                          {/* 削除 / 共通バッジ */}
                           {isOwn ? (
                             <form action={delAction}>
-                              <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors">
+                              <button type="submit" className="text-xs text-red-400 hover:text-red-600 transition-colors">
                                 削除
                               </button>
                             </form>

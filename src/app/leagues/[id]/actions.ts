@@ -104,6 +104,26 @@ export async function removeLeaguePlayer(leagueId: string, playerId: string) {
   redirect(`/leagues/${leagueId}?tab=settings`)
 }
 
+export async function hideCounterType(leagueId: string, counterId: string) {
+  const supabase = await createAuthClient()
+  await supabase
+    .from('league_counter_type_hidden')
+    .upsert({ league_id: leagueId, counter_type_id: counterId })
+  revalidatePath(`/leagues/${leagueId}`)
+  redirect(`/leagues/${leagueId}?tab=settings`)
+}
+
+export async function showCounterType(leagueId: string, counterId: string) {
+  const supabase = await createAuthClient()
+  await supabase
+    .from('league_counter_type_hidden')
+    .delete()
+    .eq('league_id', leagueId)
+    .eq('counter_type_id', counterId)
+  revalidatePath(`/leagues/${leagueId}`)
+  redirect(`/leagues/${leagueId}?tab=settings`)
+}
+
 export async function addCounterType(leagueId: string, formData: FormData) {
   const supabase = await createAuthClient()
   const name = (formData.get('name') as string ?? '').trim()
