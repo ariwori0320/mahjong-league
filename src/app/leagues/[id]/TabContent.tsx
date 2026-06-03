@@ -255,6 +255,42 @@ export default function LeagueTabContent({
   // カウンター入力に表示する種類（外したものを除く）
   const activeCounterTypes = counterTypes.filter((ct: any) => !hiddenSet.has(ct.id))
 
+  // ── 成績集計：カウンター列の計算 ────────────────────────
+  // 名前→IDのマップ（activeCounterTypes のみ）
+  const ctByName: Record<string, string> = Object.fromEntries(
+    activeCounterTypes.map((ct: any) => [ct.name, ct.id as string])
+  )
+
+  // 基本グループ
+  const kyokusuId  = ctByName['局数']
+  const wagariIds  = ['和了(ツモ)', '和了(ロン)', '和了(ダマ)']
+    .map((n) => ctByName[n]).filter(Boolean) as string[]
+  const fuuroId    = ctByName['副露']
+  const houtsuuId  = ctByName['放銃']
+  const specialBasic = new Set(['局数', '和了(ツモ)', '和了(ロン)', '和了(ダマ)', '副露', '放銃'])
+  const otherBasic = activeCounterTypes.filter(
+    (ct: any) => ct.category === '基本' && !specialBasic.has(ct.name)
+  )
+
+  // 運グループ
+  const unTypes = activeCounterTypes.filter((ct: any) => ct.category === '運')
+
+  // リーチグループ
+  const riichiId       = ctByName['リーチ']
+  const riichiHoutsuuId = ctByName['リーチ後放銃']
+  const riichiRonId    = ctByName['リーチ後(ロン)']
+  const riichiTsumoId  = ctByName['リーチ後(ツモ)']
+  const specialRiichi  = new Set(['リーチ', 'リーチ後放銃', 'リーチ後(ロン)', 'リーチ後(ツモ)'])
+  const otherRiichi    = activeCounterTypes.filter(
+    (ct: any) => ct.category === 'リーチ' && !specialRiichi.has(ct.name)
+  )
+
+  // ヘルパー: 件数取得 / % 計算
+  const cnt = (stat: any, id: string | undefined) =>
+    id ? (stat.counters[id] ?? 0) : 0
+  const pct = (num: number, den: number) =>
+    den > 0 ? `${(num / den * 100).toFixed(1)}%` : '—'
+
   const getDate = (g: any) => (g.played_at as string).slice(0, 10)
 
   // 成績フィルター（クライアント側で即時フィルタリング）
@@ -504,23 +540,60 @@ export default function LeagueTabContent({
                       {leagueRule && (
                         <th className="text-center px-3 py-3 font-medium whitespace-nowrap border-l border-green-mid/50">ポイント</th>
                       )}
-                      {counterTypes.map((ct, idx) => {
-                        const prev = counterTypes[idx - 1] as any | undefined
-                        const isNewCat = !prev || prev.category !== (ct as any).category
-                        return (
-                          <th
-                            key={ct.id}
-                            className={`text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l ${isNewCat ? 'border-green-mid/60' : 'border-green-mid/30'}`}
-                          >
-                            {isNewCat && (
-                              <div className="text-[10px] font-normal text-green-mid/70 mb-0.5">
-                                {(ct as any).category || '基本'}
-                              </div>
-                            )}
-                            {ct.name}
-                          </th>
-                        )
-                      })}
+                      {/* 基本グループ（% 表示） */}
+                      {wagariIds.length > 0 && (
+                        <th className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l-2 border-green-mid/60">
+                          <div className="text-[10px] font-normal text-green-mid/70 mb-0.5">基本</div>
+                          和了率
+                        </th>
+                      )}
+                      {fuuroId && (
+                        <th className={`text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l ${wagariIds.length === 0 ? 'border-l-2 border-green-mid/60' : 'border-green-mid/30'}`}>
+                          {wagariIds.length === 0 && <div className="text-[10px] font-normal text-green-mid/70 mb-0.5">基本</div>}
+                          副露率
+                        </th>
+                      )}
+                      {houtsuuId && (
+                        <th className={`text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l ${wagariIds.length === 0 && !fuuroId ? 'border-l-2 border-green-mid/60' : 'border-green-mid/30'}`}>
+                          {wagariIds.length === 0 && !fuuroId && <div className="text-[10px] font-normal text-green-mid/70 mb-0.5">基本</div>}
+                          放銃率
+                        </th>
+                      )}
+                      {otherBasic.map((ct: any) => (
+                        <th key={ct.id} className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l border-green-mid/30">
+                          {ct.name}
+                        </th>
+                      ))}
+
+                      {/* 運グループ（数字） */}
+                      {unTypes.map((ct: any, idx: number) => (
+                        <th key={ct.id} className={`text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l ${idx === 0 ? 'border-l-2 border-green-mid/60' : 'border-green-mid/30'}`}>
+                          {idx === 0 && <div className="text-[10px] font-normal text-green-mid/70 mb-0.5">運</div>}
+                          {ct.name}
+                        </th>
+                      ))}
+
+                      {/* リーチグループ */}
+                      {riichiId && (
+                        <th className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l-2 border-green-mid/60">
+                          <div className="text-[10px] font-normal text-green-mid/70 mb-0.5">リーチ</div>
+                          リーチ
+                        </th>
+                      )}
+                      {riichiHoutsuuId && (
+                        <th className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l border-green-mid/30">後放銃率</th>
+                      )}
+                      {riichiRonId && (
+                        <th className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l border-green-mid/30">後(ロン)率</th>
+                      )}
+                      {riichiTsumoId && (
+                        <th className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l border-green-mid/30">後(ツモ)率</th>
+                      )}
+                      {otherRiichi.map((ct: any) => (
+                        <th key={ct.id} className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l border-green-mid/30">
+                          {ct.name}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -567,10 +640,68 @@ export default function LeagueTabContent({
                             )}
                           </td>
                         )}
-                        {counterTypes.map((ct) => (
+                        {/* 基本：% 表示 */}
+                        {wagariIds.length > 0 && (
+                          <td className="text-center px-3 py-3 border-l-2 border-cream">
+                            <span className="text-gray-700">
+                              {pct(wagariIds.reduce((s, id) => s + cnt(stat, id), 0), cnt(stat, kyokusuId))}
+                            </span>
+                          </td>
+                        )}
+                        {fuuroId && (
+                          <td className={`text-center px-3 py-3 border-l ${wagariIds.length === 0 ? 'border-l-2' : ''} border-cream`}>
+                            <span className="text-gray-700">{pct(cnt(stat, fuuroId), cnt(stat, kyokusuId))}</span>
+                          </td>
+                        )}
+                        {houtsuuId && (
+                          <td className={`text-center px-3 py-3 border-l ${wagariIds.length === 0 && !fuuroId ? 'border-l-2' : ''} border-cream`}>
+                            <span className="text-gray-700">{pct(cnt(stat, houtsuuId), cnt(stat, kyokusuId))}</span>
+                          </td>
+                        )}
+                        {otherBasic.map((ct: any) => (
                           <td key={ct.id} className="text-center px-3 py-3 border-l border-cream">
-                            <span className={(stat.counters[ct.id] ?? 0) > 0 ? 'text-gray-800 font-medium' : 'text-gray-300'}>
-                              {stat.counters[ct.id] ?? 0}
+                            <span className={cnt(stat, ct.id) > 0 ? 'text-gray-800 font-medium' : 'text-gray-300'}>
+                              {cnt(stat, ct.id)}
+                            </span>
+                          </td>
+                        ))}
+
+                        {/* 運：数字 */}
+                        {unTypes.map((ct: any, idx: number) => (
+                          <td key={ct.id} className={`text-center px-3 py-3 border-l ${idx === 0 ? 'border-l-2' : ''} border-cream`}>
+                            <span className={cnt(stat, ct.id) > 0 ? 'text-gray-800 font-medium' : 'text-gray-300'}>
+                              {cnt(stat, ct.id)}
+                            </span>
+                          </td>
+                        ))}
+
+                        {/* リーチ */}
+                        {riichiId && (
+                          <td className="text-center px-3 py-3 border-l-2 border-cream">
+                            <span className={cnt(stat, riichiId) > 0 ? 'text-gray-800 font-medium' : 'text-gray-300'}>
+                              {cnt(stat, riichiId)}
+                            </span>
+                          </td>
+                        )}
+                        {riichiHoutsuuId && (
+                          <td className="text-center px-3 py-3 border-l border-cream">
+                            <span className="text-gray-700">{pct(cnt(stat, riichiHoutsuuId), cnt(stat, riichiId))}</span>
+                          </td>
+                        )}
+                        {riichiRonId && (
+                          <td className="text-center px-3 py-3 border-l border-cream">
+                            <span className="text-gray-700">{pct(cnt(stat, riichiRonId), cnt(stat, riichiId))}</span>
+                          </td>
+                        )}
+                        {riichiTsumoId && (
+                          <td className="text-center px-3 py-3 border-l border-cream">
+                            <span className="text-gray-700">{pct(cnt(stat, riichiTsumoId), cnt(stat, riichiId))}</span>
+                          </td>
+                        )}
+                        {otherRiichi.map((ct: any) => (
+                          <td key={ct.id} className="text-center px-3 py-3 border-l border-cream">
+                            <span className={cnt(stat, ct.id) > 0 ? 'text-gray-800 font-medium' : 'text-gray-300'}>
+                              {cnt(stat, ct.id)}
                             </span>
                           </td>
                         ))}
