@@ -104,6 +104,26 @@ export async function removeLeaguePlayer(leagueId: string, playerId: string) {
   redirect(`/leagues/${leagueId}?tab=settings`)
 }
 
+export async function addCounterType(leagueId: string, formData: FormData) {
+  const supabase = await createAuthClient()
+  const name = (formData.get('name') as string ?? '').trim()
+  if (!name) return
+  await supabase.from('counter_types').insert({ name, league_id: leagueId })
+  revalidatePath(`/leagues/${leagueId}`)
+  redirect(`/leagues/${leagueId}?tab=settings`)
+}
+
+export async function deleteCounterType(leagueId: string, counterId: string) {
+  const supabase = await createAuthClient()
+  await supabase
+    .from('counter_types')
+    .delete()
+    .eq('id', counterId)
+    .eq('league_id', leagueId) // 自リーグのもののみ削除可
+  revalidatePath(`/leagues/${leagueId}`)
+  redirect(`/leagues/${leagueId}?tab=settings`)
+}
+
 export async function deleteLeague(leagueId: string) {
   const supabase = await createAuthClient()
   await supabase.from('leagues').delete().eq('id', leagueId)
