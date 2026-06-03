@@ -167,7 +167,8 @@ export default function LeagueTabContent({
         .from('counter_types')
         .select('*')
         .or(`league_id.eq.${id},league_id.is.null`)
-        .order('created_at'),
+        .order('category', { ascending: true })   // '基本' → '運' の順
+        .order('created_at', { ascending: true }),
       supabase
         .from('league_day_counters')
         .select('player_id, counter_type_id, count, date')
@@ -488,11 +489,23 @@ export default function LeagueTabContent({
                       {leagueRule && (
                         <th className="text-center px-3 py-3 font-medium whitespace-nowrap border-l border-green-mid/50">ポイント</th>
                       )}
-                      {counterTypes.map((ct) => (
-                        <th key={ct.id} className="text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l border-green-mid/30">
-                          {ct.name}
-                        </th>
-                      ))}
+                      {counterTypes.map((ct, idx) => {
+                        const prev = counterTypes[idx - 1] as any | undefined
+                        const isNewCat = !prev || prev.category !== (ct as any).category
+                        return (
+                          <th
+                            key={ct.id}
+                            className={`text-center px-3 py-3 font-medium whitespace-nowrap text-xs border-l ${isNewCat ? 'border-green-mid/60' : 'border-green-mid/30'}`}
+                          >
+                            {isNewCat && (
+                              <div className="text-[10px] font-normal text-green-mid/70 mb-0.5">
+                                {(ct as any).category || '基本'}
+                              </div>
+                            )}
+                            {ct.name}
+                          </th>
+                        )
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -769,47 +782,68 @@ export default function LeagueTabContent({
           <div className="mt-6 bg-white rounded-xl border border-warm-border p-6 max-w-lg shadow-sm">
             <h2 className="text-base font-semibold text-green-deep mb-1">カウンター種類</h2>
             <p className="text-xs text-warm-gray mb-4">
-              このリーグで記録する項目（役満・飛びなど）を設定します
+              このリーグで記録する項目を設定します
             </p>
 
             {counterTypes.length > 0 ? (
-              <ul className="space-y-2 mb-4">
-                {counterTypes.map((ct: any) => {
-                  const isOwn = ct.league_id === id
-                  const delAction = deleteCounterType.bind(null, id, ct.id)
+              <div className="mb-5">
+                {(['基本', '運'] as const).map((cat) => {
+                  const items = counterTypes.filter((ct: any) => (ct.category ?? '基本') === cat)
+                  if (!items.length) return null
                   return (
-                    <li key={ct.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-cream last:border-0">
-                      <span className="text-sm text-gray-800">{ct.name}</span>
-                      <div className="flex items-center gap-2 flex-none">
-                        {isOwn ? (
-                          <form action={delAction}>
-                            <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors">削除</button>
-                          </form>
-                        ) : (
-                          <span className="text-xs text-warm-gray bg-cream border border-warm-border px-2 py-0.5 rounded-full">共通</span>
-                        )}
-                      </div>
-                    </li>
+                    <div key={cat} className="mb-3">
+                      <p className="text-xs font-semibold text-green-deep mb-1.5">{cat}</p>
+                      <ul>
+                        {items.map((ct: any) => {
+                          const isOwn = ct.league_id === id
+                          const isCore = ct.league_id === null && ct.name === '局数'
+                          const delAction = deleteCounterType.bind(null, id, ct.id)
+                          return (
+                            <li key={ct.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-cream last:border-0">
+                              <span className="text-sm text-gray-800">{ct.name}</span>
+                              <div className="flex items-center gap-2 flex-none">
+                                {isOwn ? (
+                                  <form action={delAction}>
+                                    <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors">削除</button>
+                                  </form>
+                                ) : isCore ? (
+                                  <span className="text-xs text-warm-gray bg-cream border border-warm-border px-2 py-0.5 rounded-full">共通</span>
+                                ) : null}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
                   )
                 })}
-              </ul>
+              </div>
             ) : (
               <p className="text-xs text-warm-gray mb-4">まだカウンター種類がありません。</p>
             )}
 
-            <form action={addCounterTypeAction} className="flex gap-2">
-              <input
-                name="name"
-                required
-                placeholder="例: 役満、飛び、ダブル役満"
-                className="flex-1 border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
-              />
-              <button
-                type="submit"
-                className="flex-none bg-green-deep text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
-              >
-                追加
-              </button>
+            <form action={addCounterTypeAction} className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  name="name"
+                  required
+                  placeholder="例: 役満、飛び"
+                  className="flex-1 border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
+                />
+                <select
+                  name="category"
+                  className="border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
+                >
+                  <option value="基本">基本</option>
+                  <option value="運">運</option>
+                </select>
+                <button
+                  type="submit"
+                  className="flex-none bg-green-deep text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
+                >
+                  追加
+                </button>
+              </div>
             </form>
           </div>
 

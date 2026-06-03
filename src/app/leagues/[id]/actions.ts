@@ -107,8 +107,9 @@ export async function removeLeaguePlayer(leagueId: string, playerId: string) {
 export async function addCounterType(leagueId: string, formData: FormData) {
   const supabase = await createAuthClient()
   const name = (formData.get('name') as string ?? '').trim()
+  const category = (formData.get('category') as string) === '運' ? '運' : '基本'
   if (!name) return
-  await supabase.from('counter_types').insert({ name, league_id: leagueId })
+  await supabase.from('counter_types').insert({ name, league_id: leagueId, category })
   revalidatePath(`/leagues/${leagueId}`)
   redirect(`/leagues/${leagueId}?tab=settings`)
 }
