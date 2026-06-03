@@ -138,6 +138,9 @@ export default function LeagueTabContent({
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate ?? today)
   const [selectedDateInput, setSelectedDateInput] = useState(initialSelectedDate ?? today)
 
+  // カウンター種類タブ
+  const [counterCatTab, setCounterCatTab] = useState<'基本' | '運'>('基本')
+
   // 保存バナー
   const [savedType, setSavedType] = useState<'counter' | 'settings' | null>(() => {
     if (!initialSaved) return null
@@ -785,65 +788,74 @@ export default function LeagueTabContent({
               このリーグで記録する項目を設定します
             </p>
 
-            {counterTypes.length > 0 ? (
-              <div className="mb-5">
-                {(['基本', '運'] as const).map((cat) => {
-                  const items = counterTypes.filter((ct: any) => (ct.category ?? '基本') === cat)
-                  if (!items.length) return null
-                  return (
-                    <div key={cat} className="mb-3">
-                      <p className="text-xs font-semibold text-green-deep mb-1.5">{cat}</p>
-                      <ul>
-                        {items.map((ct: any) => {
-                          const isOwn = ct.league_id === id
-                          const isCore = ct.league_id === null && ct.name === '局数'
-                          const delAction = deleteCounterType.bind(null, id, ct.id)
-                          return (
-                            <li key={ct.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-cream last:border-0">
-                              <span className="text-sm text-gray-800">{ct.name}</span>
-                              <div className="flex items-center gap-2 flex-none">
-                                {isOwn ? (
-                                  <form action={delAction}>
-                                    <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors">削除</button>
-                                  </form>
-                                ) : isCore ? (
-                                  <span className="text-xs text-warm-gray bg-cream border border-warm-border px-2 py-0.5 rounded-full">共通</span>
-                                ) : null}
-                              </div>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-warm-gray mb-4">まだカウンター種類がありません。</p>
-            )}
-
-            <form action={addCounterTypeAction} className="space-y-2">
-              <div className="flex gap-2">
-                <input
-                  name="name"
-                  required
-                  placeholder="例: 役満、飛び"
-                  className="flex-1 border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
-                />
-                <select
-                  name="category"
-                  className="border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
-                >
-                  <option value="基本">基本</option>
-                  <option value="運">運</option>
-                </select>
+            {/* カテゴリタブ */}
+            <div className="flex gap-1 mb-4 border-b border-warm-border">
+              {(['基本', '運'] as const).map((cat) => (
                 <button
-                  type="submit"
-                  className="flex-none bg-green-deep text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
+                  key={cat}
+                  type="button"
+                  onClick={() => setCounterCatTab(cat)}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+                    counterCatTab === cat
+                      ? 'border-green-deep text-green-deep'
+                      : 'border-transparent text-warm-gray hover:text-green-deep'
+                  }`}
                 >
-                  追加
+                  {cat}
+                  <span className="ml-1.5 text-xs opacity-60">
+                    {counterTypes.filter((ct: any) => (ct.category ?? '基本') === cat).length}
+                  </span>
                 </button>
-              </div>
+              ))}
+            </div>
+
+            {/* 選択中カテゴリのリスト */}
+            {(() => {
+              const items = counterTypes.filter((ct: any) => (ct.category ?? '基本') === counterCatTab)
+              return items.length > 0 ? (
+                <ul className="mb-4">
+                  {items.map((ct: any) => {
+                    const isOwn = ct.league_id === id
+                    const isCore = ct.league_id === null && ct.name === '局数'
+                    const delAction = deleteCounterType.bind(null, id, ct.id)
+                    return (
+                      <li key={ct.id} className="flex items-center justify-between gap-2 py-2 border-b border-cream last:border-0">
+                        <span className="text-sm text-gray-800">{ct.name}</span>
+                        <div className="flex items-center gap-2 flex-none">
+                          {isOwn ? (
+                            <form action={delAction}>
+                              <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors">
+                                削除
+                              </button>
+                            </form>
+                          ) : isCore ? (
+                            <span className="text-xs text-warm-gray bg-cream border border-warm-border px-2 py-0.5 rounded-full">共通</span>
+                          ) : null}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p className="text-xs text-warm-gray mb-4">「{counterCatTab}」カテゴリはまだありません。</p>
+              )
+            })()}
+
+            {/* 追加フォーム（選択中カテゴリに追加） */}
+            <form action={addCounterTypeAction} className="flex gap-2">
+              <input type="hidden" name="category" value={counterCatTab} />
+              <input
+                name="name"
+                required
+                placeholder={`「${counterCatTab}」に追加`}
+                className="flex-1 border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
+              />
+              <button
+                type="submit"
+                className="flex-none bg-green-deep text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
+              >
+                追加
+              </button>
             </form>
           </div>
 
