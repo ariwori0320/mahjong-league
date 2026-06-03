@@ -1,9 +1,8 @@
-import { supabase } from '@/lib/supabase'
-import { getUser } from '@/lib/supabase-server'
+import { createAuthClient, getUser } from '@/lib/supabase-server'
 import Link from 'next/link'
 
 export default async function LeaguesPage() {
-  const user = await getUser()
+  const [user, supabase] = await Promise.all([getUser(), createAuthClient()])
 
   // 自分がメンバーのリーグ ID 一覧を取得
   const { data: memberships } = await supabase

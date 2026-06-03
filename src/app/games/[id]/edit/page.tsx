@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createAuthClient } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
@@ -7,6 +7,7 @@ import NewGameForm from '@/components/NewGameForm'
 
 async function updateGame(gameId: string, leagueId: string, formData: FormData) {
   'use server'
+  const supabase = await createAuthClient()
   const played_at = formData.get('played_at') as string
   const location = (formData.get('location') as string) || null
   const notes = (formData.get('notes') as string) || null
@@ -21,7 +22,6 @@ async function updateGame(gameId: string, leagueId: string, formData: FormData) 
     .update({ played_at, location, notes })
     .eq('id', gameId)
 
-  // 既存の結果を削除して再挿入
   await supabase.from('game_results').delete().eq('game_id', gameId)
 
   const results = playerIds.map((player_id, idx) => ({
@@ -42,6 +42,7 @@ async function updateGame(gameId: string, leagueId: string, formData: FormData) 
 
 async function deleteGame(gameId: string, leagueId: string) {
   'use server'
+  const supabase = await createAuthClient()
   await supabase.from('games').delete().eq('id', gameId)
   revalidatePath(`/leagues/${leagueId}`)
   redirect(`/leagues/${leagueId}`)
@@ -49,6 +50,7 @@ async function deleteGame(gameId: string, leagueId: string) {
 
 export default async function EditGamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const supabase = await createAuthClient()
 
   const { data: game } = await supabase
     .from('games')

@@ -1,6 +1,6 @@
 'use client'
 
-import { supabase } from '@/lib/supabase'
+import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { calcPlayerStats, type LeagueRule } from '@/lib/stats'
@@ -154,6 +154,7 @@ export default function LeagueTabContent({
   // ブラウザから直接 Supabase へクエリ（サーバー経由なし）
   const fetchAll = useCallback(async () => {
     setLoading(true)
+    const supabase = getSupabaseBrowser()
     const [g, ct, dc, lp, p, inv] = await Promise.all([
       supabase
         .from('games')

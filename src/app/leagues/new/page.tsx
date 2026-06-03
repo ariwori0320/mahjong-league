@@ -1,4 +1,3 @@
-import { supabase } from '@/lib/supabase'
 import { createAuthClient } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -6,8 +5,8 @@ import Link from 'next/link'
 
 async function createLeague(formData: FormData) {
   'use server'
-  const authClient = await createAuthClient()
-  const { data: { user } } = await authClient.auth.getUser()
+  const supabase = await createAuthClient()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const name = (formData.get('name') as string).trim()

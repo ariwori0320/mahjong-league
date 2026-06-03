@@ -1,21 +1,18 @@
 'use server'
 
-import { supabase } from '@/lib/supabase'
+import { createAuthClient } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-/**
- * カウンターを league_day_counters に日単位で保存する
- */
 export async function saveCounters(leagueId: string, date: string, formData: FormData) {
-  // その日の既存カウンターを削除
+  const supabase = await createAuthClient()
+
   await supabase
     .from('league_day_counters')
     .delete()
     .eq('league_id', leagueId)
     .eq('date', date)
 
-  // FormData のキーは `${player_id}_${counter_type_id}` 形式（UUID_UUID）
   const inserts: {
     league_id: string
     player_id: string
@@ -41,20 +38,16 @@ export async function saveCounters(leagueId: string, date: string, formData: For
   redirect(`/leagues/${leagueId}?tab=input&saved=1&date=${date}`)
 }
 
-/**
- * 招待リンクのトークンを生成（既存のものは上書き）
- */
 export async function generateInvite(leagueId: string) {
+  const supabase = await createAuthClient()
   await supabase.from('league_invites').delete().eq('league_id', leagueId)
   await supabase.from('league_invites').insert({ league_id: leagueId })
   revalidatePath(`/leagues/${leagueId}`)
   redirect(`/leagues/${leagueId}?tab=settings`)
 }
 
-/**
- * リーグの設定（基本情報 + ポイントルール）を更新する
- */
 export async function updateLeagueSettings(leagueId: string, formData: FormData) {
+  const supabase = await createAuthClient()
   const name = (formData.get('name') as string ?? '').trim()
   if (!name) throw new Error('リーグ名は必須です')
 
@@ -89,10 +82,8 @@ export async function updateLeagueSettings(leagueId: string, formData: FormData)
   redirect(`/leagues/${leagueId}?tab=settings&saved=1`)
 }
 
-/**
- * リーグにプレイヤーを手動追加する
- */
 export async function addLeaguePlayer(leagueId: string, formData: FormData) {
+  const supabase = await createAuthClient()
   const playerId = formData.get('player_id') as string
   if (!playerId) return
   await supabase
@@ -102,10 +93,8 @@ export async function addLeaguePlayer(leagueId: string, formData: FormData) {
   redirect(`/leagues/${leagueId}?tab=settings`)
 }
 
-/**
- * リーグから手動追加プレイヤーを削除する
- */
 export async function removeLeaguePlayer(leagueId: string, playerId: string) {
+  const supabase = await createAuthClient()
   await supabase
     .from('league_players')
     .delete()
@@ -115,10 +104,8 @@ export async function removeLeaguePlayer(leagueId: string, playerId: string) {
   redirect(`/leagues/${leagueId}?tab=settings`)
 }
 
-/**
- * リーグを削除する
- */
 export async function deleteLeague(leagueId: string) {
+  const supabase = await createAuthClient()
   await supabase.from('leagues').delete().eq('id', leagueId)
   revalidatePath('/leagues')
   redirect('/leagues')

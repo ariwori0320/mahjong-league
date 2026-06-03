@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createAuthClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import LeagueTabContent from './TabContent'
@@ -20,6 +20,7 @@ export default async function LeaguePage({
   const { tab = 'games', date, saved, from, to } = await searchParams
 
   // 最小限: リーグ情報 + 対局数のみ（2クエリ並列）
+  const supabase = await createAuthClient()
   const [{ data: league }, { count: gameCount }] = await Promise.all([
     supabase.from('leagues').select('*').eq('id', id).single(),
     supabase.from('games').select('id', { count: 'exact', head: true }).eq('league_id', id),

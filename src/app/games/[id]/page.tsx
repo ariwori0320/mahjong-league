@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createAuthClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
@@ -12,6 +12,7 @@ const rankBg = [
 
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const supabase = await createAuthClient()
 
   const { data: game } = await supabase
     .from('games')

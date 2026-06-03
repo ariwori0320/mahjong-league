@@ -1,9 +1,10 @@
-import { supabase } from '@/lib/supabase'
+import { createAuthClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const supabase = await createAuthClient()
 
   const { data: player } = await supabase
     .from('players')

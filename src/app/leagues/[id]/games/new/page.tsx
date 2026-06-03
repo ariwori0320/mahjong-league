@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createAuthClient } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
@@ -7,6 +7,7 @@ import NewGameForm from '@/components/NewGameForm'
 
 async function createGame(leagueId: string, formData: FormData) {
   'use server'
+  const supabase = await createAuthClient()
   const played_at = formData.get('played_at') as string
   const location = (formData.get('location') as string) || null
   const notes = (formData.get('notes') as string) || null
@@ -47,6 +48,7 @@ async function createGame(leagueId: string, formData: FormData) {
 export default async function NewGamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
+  const supabase = await createAuthClient()
   const { data: league } = await supabase
     .from('leagues')
     .select('*')

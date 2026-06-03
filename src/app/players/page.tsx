@@ -1,10 +1,11 @@
-import { supabase } from '@/lib/supabase'
+import { createAuthClient } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
 async function addPlayer(formData: FormData) {
   'use server'
+  const supabase = await createAuthClient()
   const name = (formData.get('name') as string).trim()
   if (!name) return
   await supabase.from('players').insert({ name })
@@ -14,6 +15,7 @@ async function addPlayer(formData: FormData) {
 
 async function deletePlayer(formData: FormData) {
   'use server'
+  const supabase = await createAuthClient()
   const id = formData.get('id') as string
   await supabase.from('players').delete().eq('id', id)
   revalidatePath('/players')
@@ -21,6 +23,7 @@ async function deletePlayer(formData: FormData) {
 }
 
 export default async function PlayersPage() {
+  const supabase = await createAuthClient()
   const { data: players } = await supabase
     .from('players')
     .select('*')

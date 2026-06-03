@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase'
-import { getUser } from '@/lib/supabase-server'
+import { createAuthClient, getUser } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 
@@ -9,6 +8,7 @@ export default async function InvitePage({
   params: Promise<{ token: string }>
 }) {
   const { token } = await params
+  const supabase = await createAuthClient()
 
   // 招待トークンを検索
   const { data: invite } = await supabase
