@@ -142,7 +142,7 @@ export default function LeagueTabContent({
   const [selectedDateInput, setSelectedDateInput] = useState(initialSelectedDate ?? today)
 
   // カウンター種類タブ
-  const [counterCatTab, setCounterCatTab] = useState<'基本' | '運'>('基本')
+  const [counterCatTab, setCounterCatTab] = useState<'基本' | '運' | 'リーチ'>('基本')
 
   // 保存バナー
   const [savedType, setSavedType] = useState<'counter' | 'settings' | null>(() => {
@@ -802,7 +802,7 @@ export default function LeagueTabContent({
 
             {/* カテゴリタブ */}
             <div className="flex gap-1 mb-4 border-b border-warm-border">
-              {(['基本', '運'] as const).map((cat) => (
+              {(['基本', '運', 'リーチ'] as const).map((cat) => (
                 <button
                   key={cat}
                   type="button"
@@ -840,25 +840,27 @@ export default function LeagueTabContent({
                       >
                         <span className="text-sm text-gray-800">{ct.name}</span>
                         <div className="flex items-center gap-2 flex-none">
-                          {/* 追加 / 外す */}
-                          {isHidden ? (
-                            <form action={showAction}>
-                              <button
-                                type="submit"
-                                className="text-xs text-green-deep border border-green-deep px-2 py-0.5 rounded hover:bg-green-light transition-colors"
-                              >
-                                追加
-                              </button>
-                            </form>
-                          ) : (
-                            <form action={hideAction}>
-                              <button
-                                type="submit"
-                                className="text-xs text-warm-gray border border-warm-border px-2 py-0.5 rounded hover:bg-cream transition-colors"
-                              >
-                                外す
-                              </button>
-                            </form>
+                          {/* 追加 / 外す（共通＝局数 は非表示） */}
+                          {!isCore && (
+                            isHidden ? (
+                              <form action={showAction}>
+                                <button
+                                  type="submit"
+                                  className="text-xs text-green-deep border border-green-deep px-2 py-0.5 rounded hover:bg-green-light transition-colors"
+                                >
+                                  追加
+                                </button>
+                              </form>
+                            ) : (
+                              <form action={hideAction}>
+                                <button
+                                  type="submit"
+                                  className="text-xs text-warm-gray border border-warm-border px-2 py-0.5 rounded hover:bg-cream transition-colors"
+                                >
+                                  外す
+                                </button>
+                              </form>
+                            )
                           )}
                           {/* 削除 / 共通バッジ */}
                           {isOwn ? (
@@ -880,22 +882,6 @@ export default function LeagueTabContent({
               )
             })()}
 
-            {/* 追加フォーム（選択中カテゴリに追加） */}
-            <form action={addCounterTypeAction} className="flex gap-2">
-              <input type="hidden" name="category" value={counterCatTab} />
-              <input
-                name="name"
-                required
-                placeholder={`「${counterCatTab}」に追加`}
-                className="flex-1 border border-warm-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-mid"
-              />
-              <button
-                type="submit"
-                className="flex-none bg-green-deep text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors"
-              >
-                追加
-              </button>
-            </form>
           </div>
 
           <div className="mt-6 bg-white rounded-xl border border-warm-border p-6 max-w-lg shadow-sm">
