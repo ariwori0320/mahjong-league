@@ -124,6 +124,19 @@ export async function showCounterType(leagueId: string, counterId: string) {
   redirect(`/leagues/${leagueId}?tab=settings`)
 }
 
+export async function saveCounterVisibility(leagueId: string, hiddenIds: string[]) {
+  const supabase = await createAuthClient()
+  // いったん全て消してから、外す対象だけを入れ直す（まとめ保存）
+  await supabase.from('league_counter_type_hidden').delete().eq('league_id', leagueId)
+  if (hiddenIds.length > 0) {
+    await supabase.from('league_counter_type_hidden').insert(
+      hiddenIds.map((counter_type_id) => ({ league_id: leagueId, counter_type_id }))
+    )
+  }
+  revalidatePath(`/leagues/${leagueId}`)
+  redirect(`/leagues/${leagueId}?tab=settings&saved=1`)
+}
+
 export async function addCounterType(leagueId: string, formData: FormData) {
   const supabase = await createAuthClient()
   const name = (formData.get('name') as string ?? '').trim()

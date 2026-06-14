@@ -54,6 +54,17 @@ export default function CounterInputForm({ players, counterTypes, initialValues,
         ))
       )}
 
+      {/* 上部固定の保存ボタン（スクロールしても常に表示） */}
+      <div className="sticky top-0 z-20 -mx-4 px-4 py-2.5 mb-4 bg-cream/95 backdrop-blur-sm border-b border-warm-border">
+        <button
+          type="submit"
+          className="w-full bg-green-deep text-white py-3 rounded-xl font-bold text-base
+            hover:bg-green-mid active:scale-[0.98] transition-all shadow-sm"
+        >
+          保存する
+        </button>
+      </div>
+
       {/* プレイヤー選択タブ */}
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1 -mx-4 px-4 snap-x">
         {players.map((p) => {

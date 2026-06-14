@@ -1,7 +1,7 @@
 'use client'
 
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useTransition } from 'react'
 import Link from 'next/link'
 import { calcPlayerStats, type LeagueRule } from '@/lib/stats'
 import CounterInputForm from '@/components/CounterInputForm'
@@ -15,8 +15,7 @@ import {
   removeLeaguePlayer,
   addCounterType,
   deleteCounterType,
-  hideCounterType,
-  showCounterType,
+  saveCounterVisibility,
 } from './actions'
 
 // ── 定数 ──────────────────────────────────────────────────────
@@ -143,6 +142,13 @@ export default function LeagueTabContent({
 
   // カウンター種類タブ
   const [counterCatTab, setCounterCatTab] = useState<'基本' | '運' | 'リーチ'>('基本')
+
+  // カウンター種類の「外す」状態（ローカルで切り替え → 保存ボタンでまとめて保存）
+  const [hiddenLocal, setHiddenLocal] = useState<Set<string>>(new Set())
+  const [savingVisibility, startSaveVisibility] = useTransition()
+  useEffect(() => {
+    if (d) setHiddenLocal(new Set(d.hiddenCounterTypeIds))
+  }, [d])
 
   // 保存バナー
   const [savedType, setSavedType] = useState<'counter' | 'settings' | null>(() => {
@@ -379,6 +385,20 @@ export default function LeagueTabContent({
   const deleteLeagueAction = deleteLeague.bind(null, id)
   const addLeaguePlayerAction = addLeaguePlayer.bind(null, id)
   const addCounterTypeAction = addCounterType.bind(null, id)
+
+  // カウンター種類の「外す」状態: ローカルと保存済みの差分があれば未保存
+  const visibilityDirty =
+    hiddenLocal.size !== hiddenCounterTypeIds.length ||
+    hiddenCounterTypeIds.some((cid) => !hiddenLocal.has(cid))
+  const toggleHiddenLocal = (ctId: string) =>
+    setHiddenLocal((prev) => {
+      const next = new Set(prev)
+      if (next.has(ctId)) next.delete(ctId)
+      else next.add(ctId)
+      return next
+    })
+  const saveVisibility = () =>
+    startSaveVisibility(() => saveCounterVisibility(id, Array.from(hiddenLocal)))
 
   // ── 描画 ─────────────────────────────────────────────────
   return (
@@ -960,10 +980,8 @@ export default function LeagueTabContent({
                   {items.map((ct: any) => {
                     const isOwn = ct.league_id === id
                     const isCore = ct.league_id === null && ct.name === '局数'
-                    const isHidden = hiddenSet.has(ct.id)
+                    const isHidden = hiddenLocal.has(ct.id)
                     const delAction = deleteCounterType.bind(null, id, ct.id)
-                    const hideAction = hideCounterType.bind(null, id, ct.id)
-                    const showAction = showCounterType.bind(null, id, ct.id)
                     return (
                       <li
                         key={ct.id}
@@ -971,27 +989,19 @@ export default function LeagueTabContent({
                       >
                         <span className="text-sm text-gray-800">{ct.name}</span>
                         <div className="flex items-center gap-2 flex-none">
-                          {/* 追加 / 外す（共通＝局数 は非表示） */}
+                          {/* 追加 / 外す: ローカルで切り替え、下の「変更を保存する」で確定 */}
                           {!isCore && (
-                            isHidden ? (
-                              <form action={showAction}>
-                                <button
-                                  type="submit"
-                                  className="text-xs text-green-deep border border-green-deep px-2 py-0.5 rounded hover:bg-green-light transition-colors"
-                                >
-                                  追加
-                                </button>
-                              </form>
-                            ) : (
-                              <form action={hideAction}>
-                                <button
-                                  type="submit"
-                                  className="text-xs text-warm-gray border border-warm-border px-2 py-0.5 rounded hover:bg-cream transition-colors"
-                                >
-                                  外す
-                                </button>
-                              </form>
-                            )
+                            <button
+                              type="button"
+                              onClick={() => toggleHiddenLocal(ct.id)}
+                              className={
+                                isHidden
+                                  ? 'text-xs text-green-deep border border-green-deep px-2 py-0.5 rounded hover:bg-green-light transition-colors'
+                                  : 'text-xs text-warm-gray border border-warm-border px-2 py-0.5 rounded hover:bg-cream transition-colors'
+                              }
+                            >
+                              {isHidden ? '追加' : '外す'}
+                            </button>
                           )}
                           {/* 削除 / 共通バッジ */}
                           {isOwn ? (
@@ -1013,11 +1023,25 @@ export default function LeagueTabContent({
               )
             })()}
 
+            {/* まとめて保存（未保存の変更があるときだけ表示） */}
+            {visibilityDirty && (
+              <div className="flex items-center gap-3 border-t border-cream pt-4 mt-1">
+                <button
+                  type="button"
+                  onClick={saveVisibility}
+                  disabled={savingVisibility}
+                  className="bg-green-deep text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors shadow-sm disabled:opacity-60"
+                >
+                  {savingVisibility ? '保存中…' : '変更を保存する'}
+                </button>
+                <span className="text-xs text-vermilion font-medium">未保存の変更があります</span>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 bg-white rounded-xl border border-warm-border p-6 max-w-lg shadow-sm">
             <h2 className="text-base font-semibold text-green-deep mb-1">メンバー招待</h2>
-            <p className="text-xs text-warm-gray mb-4">招待リンクを共有すると、相手がログイン後にこのリーグのメンバーに自動追加されます。</p>
+            <p className="text-xs text-warm-gray mb-4">招待リンクを共有すると、相手がログイン後にこのリーグのメンバーに自動追加され、閲覧・編集ができるようになります。</p>
             {invite?.token ? (
               <div className="space-y-3">
                 <CopyTokenLink path={`/invite/${invite.token}`} />

@@ -39,23 +39,30 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* ナビゲーション */}
         <header>
           <nav className="bg-green-deep shadow-lg">
-            <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-              <Link href="/" className="flex items-center gap-2 text-white font-bold text-lg tracking-widest">
-                <span className="text-2xl">🀄</span>
-                <span>麻雀リーグ</span>
+            <div className="max-w-4xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
+              {/* タイトルロゴ */}
+              <Link href="/" className="flex items-center flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logo.png"
+                  alt="麻雀リーグ戦管理"
+                  className="h-6 sm:h-9 w-auto"
+                />
               </Link>
-              <div className="flex items-center gap-1">
+
+              {/* ナビボタン（モバイル対応） */}
+              <div className="flex items-center gap-0.5 sm:gap-1 flex-none">
                 {user ? (
                   <>
                     <Link
                       href="/leagues"
-                      className="text-sm text-green-100 hover:text-white hover:bg-white/10 px-3 py-3 sm:px-4 rounded transition-all duration-150"
+                      className="text-xs sm:text-sm text-green-100 hover:text-white hover:bg-white/10 px-2 sm:px-3 py-2 sm:py-3 rounded transition-all duration-150 whitespace-nowrap"
                     >
                       リーグ一覧
                     </Link>
                     <Link
                       href="/players"
-                      className="text-sm text-green-100 hover:text-white hover:bg-white/10 px-3 py-3 sm:px-4 rounded transition-all duration-150"
+                      className="text-xs sm:text-sm text-green-100 hover:text-white hover:bg-white/10 px-2 sm:px-3 py-2 sm:py-3 rounded transition-all duration-150 whitespace-nowrap"
                     >
                       プレイヤー
                     </Link>
@@ -63,12 +70,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       <button
                         type="submit"
                         title={user.email ?? 'ログアウト'}
-                        className="ml-2 text-xs text-green-200 hover:text-white hover:bg-white/10 px-3 py-2 rounded transition-all duration-150 border border-white/20 hover:border-white/40"
+                        className="ml-1 text-xs text-green-200 hover:text-white hover:bg-white/10 px-2 sm:px-3 py-2 rounded transition-all duration-150 border border-white/20 hover:border-white/40 whitespace-nowrap"
                       >
-                        {user.user_metadata?.name
-                          ? user.user_metadata.name.split(' ')[0]
-                          : (user.email?.split('@')[0] ?? 'ユーザー')}
-                        　ログアウト
+                        {/* スマホでは名前を非表示 */}
+                        <span className="hidden sm:inline">
+                          {user.user_metadata?.name
+                            ? user.user_metadata.name.split(' ')[0]
+                            : (user.email?.split('@')[0] ?? 'ユーザー')}
+
+                        </span>
+                        ログアウト
                       </button>
                     </form>
                   </>
