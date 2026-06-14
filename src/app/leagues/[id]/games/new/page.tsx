@@ -1,4 +1,5 @@
 import { createAuthClient } from '@/lib/supabase-server'
+import { getLeaguePlayers } from '@/lib/league-players'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
@@ -57,10 +58,8 @@ export default async function NewGamePage({ params }: { params: Promise<{ id: st
 
   if (!league) notFound()
 
-  const { data: players } = await supabase
-    .from('players')
-    .select('id, name')
-    .order('name')
+  // このリーグに登録されたメンバーだけを選択肢にする
+  const players = await getLeaguePlayers(supabase, id)
 
   const action = createGame.bind(null, id)
 
@@ -77,14 +76,14 @@ export default async function NewGamePage({ params }: { params: Promise<{ id: st
         <h1 className="text-2xl font-bold text-green-deep mt-2">対局を追加</h1>
       </div>
 
-      {(players?.length ?? 0) < 4 ? (
+      {players.length < 4 ? (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-sm text-yellow-800">
-          対局を追加するには先に4人以上のプレイヤーを登録してください。
-          <Link href="/players" className="text-green-deep underline ml-1 font-medium">プレイヤー管理へ →</Link>
+          対局を追加するには、先にこのリーグに4人以上のメンバーを登録してください。
+          <Link href={`/leagues/${id}?tab=settings`} className="text-green-deep underline ml-1 font-medium">設定でメンバーを追加 →</Link>
         </div>
       ) : (
         <NewGameForm
-          players={players ?? []}
+          players={players}
           action={action}
           defaultDate={today}
           leagueId={id}

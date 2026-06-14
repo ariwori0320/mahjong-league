@@ -1,4 +1,5 @@
 import { createAuthClient } from '@/lib/supabase-server'
+import { getLeaguePlayers } from '@/lib/league-players'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
@@ -63,10 +64,8 @@ export default async function EditGamePage({ params }: { params: Promise<{ id: s
   const league = game.leagues as any
   const results = (game.game_results as any[])?.sort((a, b) => a.rank - b.rank)
 
-  const { data: players } = await supabase
-    .from('players')
-    .select('id, name')
-    .order('name')
+  // このリーグに登録されたメンバーだけを選択肢にする
+  const players = await getLeaguePlayers(supabase, league?.id)
 
   const gameDate = (game.played_at as string).slice(0, 10)
   const initialPlayerIds = results?.map((r: any) => r.player_id) ?? []
@@ -88,7 +87,7 @@ export default async function EditGamePage({ params }: { params: Promise<{ id: s
       </div>
 
       <NewGameForm
-        players={players ?? []}
+        players={players}
         action={editAction}
         defaultDate={gameDate}
         leagueId={league?.id}
