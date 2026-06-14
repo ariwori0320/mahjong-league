@@ -122,13 +122,16 @@ export default function CounterInputForm({ players, counterTypes, initialValues,
                 >
                   −
                 </button>
-                {/* 数値入力（直接修正用） */}
+                {/* 数値入力（直接修正用）。0 のときは空表示にして先頭の0が残らないようにする */}
                 <input
                   type="number"
-                  value={count}
+                  inputMode="numeric"
+                  value={count === 0 ? '' : count}
                   min="0"
+                  placeholder="0"
                   onChange={(e) => set(k, e.target.value)}
                   className="w-14 h-11 text-center border-2 border-warm-border rounded-lg
+                    placeholder:text-gray-300 placeholder:font-normal
                     text-base font-bold text-gray-900
                     focus:outline-none focus:border-green-mid focus:ring-2 focus:ring-green-mid/20
                     transition-colors"
