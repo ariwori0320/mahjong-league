@@ -802,6 +802,8 @@ export default function LeagueTabContent({
             </div>
           ) : (
             <CounterInputForm
+              // 日付ごとに保存済みの値で初期化し直す（日付を切り替えても0にならない）
+              key={selectedDate}
               players={inputPlayers}
               counterTypes={activeCounterTypes}
               initialValues={inputCounterMap}
