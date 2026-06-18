@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
 /**
  * サーバーコンポーネント・サーバーアクション向け Supabase クライアント（セッション付き）
@@ -30,11 +31,14 @@ export async function createAuthClient() {
 
 /**
  * 現在ログイン中のユーザーを取得する。未ログインなら null。
+ *
+ * React の cache() でラップしているので、同じリクエスト内（例: layout と
+ * ページの両方）で複数回呼ばれても認証サーバーへの往復は1回で済む。
  */
-export async function getUser() {
+export const getUser = cache(async () => {
   const client = await createAuthClient()
   const {
     data: { user },
   } = await client.auth.getUser()
   return user
-}
+})
