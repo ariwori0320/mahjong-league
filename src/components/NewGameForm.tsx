@@ -27,9 +27,23 @@ export default function NewGameForm({
   initialPlayerIds, initialScores, initialLocation, initialNotes,
 }: Props) {
   const [scores, setScores] = useState(initialScores ?? ['', '', '', ''])
+  // テンキーの入力対象（何人目の点数を入力中か）
+  const [activeIdx, setActiveIdx] = useState(0)
 
-  const setScore = (i: number, val: string) =>
-    setScores((prev) => prev.map((v, j) => (j === i ? val : v)))
+  // テンキー操作（クリックだけで点数入力できる）
+  const tapDigit = (d: string) =>
+    setScores((prev) =>
+      prev.map((v, i) => {
+        if (i !== activeIdx) return v
+        const base = v === '0' ? '' : v // 先頭の0は残さない
+        const next = base + d
+        return next.length > 4 ? v : next // 上限4桁（=999900点）
+      })
+    )
+  const tapBackspace = () =>
+    setScores((prev) => prev.map((v, i) => (i === activeIdx ? v.slice(0, -1) : v)))
+  const tapClear = () =>
+    setScores((prev) => prev.map((v, i) => (i === activeIdx ? '' : v)))
 
   // 各スロットの点数をパース（未入力は null）
   const parsed = scores.map((s) => {
@@ -94,25 +108,73 @@ export default function NewGameForm({
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
-                <div className="flex items-center gap-1 flex-none">
-                  <input
-                    name={`score_${i + 1}`}
-                    type="number"
-                    required
-                    value={scores[i]}
-                    onChange={(e) => setScore(i, e.target.value)}
-                    placeholder={isAutoSlot ? '自動' : '350'}
-                    className={`w-20 border-2 rounded-lg px-2 py-2.5 text-sm text-right bg-white focus:outline-none transition-colors
-                      ${isAutoSlot
-                        ? 'border-green-mid bg-green-light/40 focus:border-green-deep placeholder:text-green-mid'
-                        : 'border-warm-border focus:border-green-mid focus:ring-1 focus:ring-green-mid'
-                      }`}
-                  />
-                  <span className="text-sm font-medium text-warm-gray select-none">00</span>
-                </div>
+                {/* 点数: フォーム送信用の hidden + タップで選択する表示ボタン */}
+                <input type="hidden" name={`score_${i + 1}`} value={scores[i]} />
+                <button
+                  type="button"
+                  onClick={() => setActiveIdx(i)}
+                  className={`flex items-center justify-end gap-1 flex-none w-24 h-11 px-3 rounded-lg border-2 bg-white transition-colors
+                    ${activeIdx === i
+                      ? 'border-green-deep ring-2 ring-green-mid/20'
+                      : isAutoSlot
+                        ? 'border-green-mid bg-green-light/40'
+                        : 'border-warm-border'
+                    }`}
+                >
+                  {scores[i] === '' ? (
+                    <span className={`text-base font-bold ${isAutoSlot ? 'text-green-mid' : 'text-gray-300'}`}>
+                      {isAutoSlot ? '自動' : '—'}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-base font-bold text-gray-900">{scores[i]}</span>
+                      <span className="text-xs font-medium text-warm-gray">00</span>
+                    </>
+                  )}
+                </button>
               </div>
             )
           })}
+        </div>
+
+        {/* テンキー（クリックだけで点数入力） */}
+        <div className="mt-4 bg-cream/60 border border-warm-border rounded-xl p-3">
+          <p className="text-xs text-warm-gray text-center mb-2">
+            <span className="font-semibold text-green-deep">{activeIdx + 1}人目</span>の点数を入力中（数字をタップ）
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => tapDigit(d)}
+                className="h-12 rounded-lg bg-white border border-warm-border text-lg font-bold text-gray-900 hover:border-green-mid active:scale-95 transition-all select-none"
+              >
+                {d}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={tapClear}
+              className="h-12 rounded-lg bg-white border border-warm-border text-sm font-medium text-warm-gray hover:border-vermilion hover:text-vermilion active:scale-95 transition-all select-none"
+            >
+              C
+            </button>
+            <button
+              type="button"
+              onClick={() => tapDigit('0')}
+              className="h-12 rounded-lg bg-white border border-warm-border text-lg font-bold text-gray-900 hover:border-green-mid active:scale-95 transition-all select-none"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={tapBackspace}
+              className="h-12 rounded-lg bg-white border border-warm-border text-lg text-gray-700 hover:border-green-mid active:scale-95 transition-all select-none"
+            >
+              ⌫
+            </button>
+          </div>
         </div>
 
         {/* 再計算ボタン */}
@@ -157,7 +219,12 @@ export default function NewGameForm({
       <div className="flex gap-3 pt-1">
         <button
           type="submit"
-          className="bg-green-deep text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-green-mid transition-colors shadow-sm"
+          disabled={filledCount !== 4}
+          className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${
+            filledCount === 4
+              ? 'bg-green-deep text-white hover:bg-green-mid'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
         >
           保存する
         </button>
