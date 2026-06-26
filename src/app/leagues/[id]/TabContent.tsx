@@ -552,10 +552,10 @@ export default function LeagueTabContent({
                       <th className="text-left px-4 py-3 font-medium whitespace-nowrap sticky left-0 bg-green-deep">プレイヤー</th>
                       <th className="text-center px-3 py-3 font-medium whitespace-nowrap">対局数</th>
                       <th className="text-center px-3 py-3 font-medium whitespace-nowrap">平均順位</th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">1位率</th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">2位率</th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">3位率</th>
-                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">4位率</th>
+                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">1位<span className="text-[10px] font-normal opacity-70">（回/率）</span></th>
+                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">2位<span className="text-[10px] font-normal opacity-70">（回/率）</span></th>
+                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">3位<span className="text-[10px] font-normal opacity-70">（回/率）</span></th>
+                      <th className="text-center px-3 py-3 font-medium whitespace-nowrap">4位<span className="text-[10px] font-normal opacity-70">（回/率）</span></th>
                       <th className="text-center px-3 py-3 font-medium whitespace-nowrap">平均点</th>
                       {leagueRule && (
                         <th className="text-center px-3 py-3 font-medium whitespace-nowrap border-l border-green-mid/50">ポイント</th>
@@ -631,20 +631,28 @@ export default function LeagueTabContent({
                           </span>
                         </td>
                         <td className="text-center px-3 py-3">
-                          <span className={`font-semibold ${stat.topRate >= 30 ? 'text-vermilion' : 'text-gray-700'}`}>
-                            {stat.topRate}%
-                          </span>
+                          <div className="font-semibold text-gray-800">
+                            {stat.topCount}<span className="text-[11px] font-normal text-warm-gray">回</span>
+                          </div>
+                          <div className={`text-[11px] ${stat.topRate >= 30 ? 'text-vermilion' : 'text-warm-gray'}`}>{stat.topRate}%</div>
                         </td>
                         <td className="text-center px-3 py-3">
-                          <span className="text-gray-600">{stat.secondRate}%</span>
+                          <div className="font-semibold text-gray-700">
+                            {stat.secondCount}<span className="text-[11px] font-normal text-warm-gray">回</span>
+                          </div>
+                          <div className="text-[11px] text-warm-gray">{stat.secondRate}%</div>
                         </td>
                         <td className="text-center px-3 py-3">
-                          <span className="text-gray-500">{stat.thirdRate}%</span>
+                          <div className="font-semibold text-gray-700">
+                            {stat.thirdCount}<span className="text-[11px] font-normal text-warm-gray">回</span>
+                          </div>
+                          <div className="text-[11px] text-warm-gray">{stat.thirdRate}%</div>
                         </td>
                         <td className="text-center px-3 py-3">
-                          <span className={stat.lastRate >= 30 ? 'text-vermilion' : 'text-gray-500'}>
-                            {stat.lastRate}%
-                          </span>
+                          <div className="font-semibold text-gray-700">
+                            {stat.lastCount}<span className="text-[11px] font-normal text-warm-gray">回</span>
+                          </div>
+                          <div className={`text-[11px] ${stat.lastRate >= 30 ? 'text-vermilion' : 'text-warm-gray'}`}>{stat.lastRate}%</div>
                         </td>
                         <td className="text-center px-3 py-3 text-gray-700">
                           {stat.avgScore.toLocaleString()}
